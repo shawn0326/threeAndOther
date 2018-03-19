@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - glTF loader</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			a {
+				color:#00ff78;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 0px;
+				width: 100%;
+				padding: 5px;
+			}
+			.dg.ac {
+				z-index: 1 !important; /* FIX DAT.GUI */
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+			<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - GLTFLoader<br />
+			Battle Damaged Sci-fi Helmet by
+			<a href="https://sketchfab.com/theblueturtle_" target="_blank" rel="noopener">theblueturtle_</a><br />
+		</div>
+
+		<script src="js/three.js"></script>
+		<script src="js/custom/OrbitControls.js"></script>
+		<script src="js/GLTFLoader.js"></script>
+
+		<script src="js/shaders/CopyShader.js"></script>
+		<script src="js/shaders/SMAAShader.js"></script>
+		<script src="js/shaders/SSAOShader.js"></script>
+		<script src="js/shaders/SAOShader.js"></script>
+		<script src="js/shaders/DepthLimitedBlurShader.js"></script>
+		<script src="js/shaders/UnpackDepthRGBAShader.js"></script>
+
+		<script src="js/postprocessing/EffectComposer.js"></script>
+		<script src="js/postprocessing/SMAAPass.js"></script>
+		<script src="js/postprocessing/SSAARenderPass.js"></script>
+		<script src="js/postprocessing/TAARenderPass.js"></script>
+		<script src="js/postprocessing/RenderPass.js"></script>
+		<script src="js/postprocessing/MaskPass.js"></script>
+		<script src="js/postprocessing/ShaderPass.js"></script>
+		<script src="js/postprocessing/SSAOPass.js"></script>
+		<script src="js/postprocessing/SAOPass.js"></script>
+
+		<script src="js/libs/stats.min.js"></script>
+		<script src='js/libs/dat.gui.min.js'></script>
+
+		<script>
+
+			var container, stats, controls;
+			var camera, scene, renderer, light;
+
+			var lightHelper;
+
+			var taaRenderPass,renderPass, composer, copyPass, smaaPass;
+
+			var postprocessing = { ssaoEnable: false, onlyAO: false, radius: 0.5, aoClamp: 0.8, lumInfluence: 1 };
+			var shadow = { shadowEnable: true, shadowBias: -0.003, shadowRadius: 0.2};
+
+			var param = { AAEnabled: "3", TAASampleLevel: 0 };
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera.position.set( 80, 80, 80 );
+				camera.lookAt(0, 0, 0);
+
+				controls = new THREE.OrbitControls( camera , container);
+				controls.target.set( 0, 0, 0 );
+				controls.update();
+
+				// envmap
+				var path = '../res/skyboxsun25deg/';
+				var format = '.jpg';
+				var envMap = new THREE.CubeTextureLoader().load( [
+					path + 'px' + format, path + 'nx' + format,
+					path + 'py' + format, path + 'ny' + format,
+					path + 'pz' + format, path + 'nz' + format
+				] );
+
+				scene = new THREE.Scene();
+				scene.background = envMap;
+
+				// 模拟大气散射的半球光
+				light = new THREE.HemisphereLight( 0xcccccc, 0x999999 );
+				light.position.set( 0, 1, 0 );
+				scene.add( light );
+
+				// 在使用ssao的情况下，不够亮，补一个环境光
+				// light = new THREE.AmbientLight(0x555555);
+				// scene.add( light );
+
+				// 模拟太阳直射光
+				light = new THREE.DirectionalLight( 0xffffff );
+				light.position.set( 50, 30, 40 );
+                light.castShadow = true;
+                light.shadow.mapSize.width = 1024;
+                light.shadow.mapSize.height = 1024;
+                light.shadow.camera.near = 5;    // default
+                light.shadow.camera.far = 200;
+				var shadowSize = 100;
+				light.shadow.camera.left = -shadowSize;
+				light.shadow.camera.right = shadowSize;
+				light.shadow.camera.top = shadowSize;
+				light.shadow.camera.bottom = -shadowSize;
+				// light.intensity = 0.8;
+				scene.add( light );
+				// 灯光照向模型
+				scene.add( light.target );
+				light.target.position.set(20, 0, 20);
+
+                lightHelper = new THREE.DirectionalLightHelper( light, 5 );
+                // scene.add( lightHelper );
+
+				var modelScale = 0.4;
+				// model
+				var loader = new THREE.GLTFLoader();
+				loader.load( '../res/uinv/scene.gltf', function ( gltf ) {
+
+					gltf.scene.traverse( function ( child ) {
+
+						if ( child.isMesh ) {
+
+							child.castShadow = true;
+                            child.receiveShadow = true;
+
+						}
+
+					} );
+
+                    gltf.scene.children[0].scale.set(modelScale, modelScale, modelScale);
+
+					scene.add( gltf.scene.children[0] );
+
+                    renderer.needsUpdate = true;
+
+					screenCache = false;
+
+				} );
+
+				// 抗锯齿 使用processing处理的情况下，antialias无效
+				// 因为antialias只对backbuffer生效，对framebuffer不生效
+				// 所以，在使用了其它processingpass的情况下，需要配合使用抗锯齿pass
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				// renderer = new THREE.WebGLRenderer();
+
+				// 在retina屏幕上大幅提高画面质量
+				renderer.setPixelRatio( window.devicePixelRatio );
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.gammaOutput = true;
+
+				// 使用预烘培的阴影贴图
+                renderer.shadowMap.enabled = true;
+                renderer.autoUpdate = false;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+
+				container.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+				// post processing
+
+				composer = new THREE.EffectComposer( renderer );
+
+				taaRenderPass = new THREE.TAARenderPass( scene, camera );
+				taaRenderPass.unbiased = false;
+				composer.addPass( taaRenderPass );
+
+				ssaaRenderPass = new THREE.SSAARenderPass( scene, camera );
+				ssaaRenderPass.unbiased = false;
+				composer.addPass( ssaaRenderPass );
+
+				renderPass = new THREE.RenderPass( scene, camera );
+				composer.addPass( renderPass );
+
+				ssaoPass = new THREE.SSAOPass( scene, camera );
+				composer.addPass( ssaoPass );
+
+				smaaPass = new THREE.SMAAPass( window.innerWidth, window.innerHeight );
+				smaaPass.enabled = true;
+				smaaPass.renderToScreen = true;
+				composer.addPass( smaaPass );
+
+				copyPass = new THREE.ShaderPass( THREE.CopyShader );
+		    	copyPass.renderToScreen = true;
+				composer.addPass( copyPass );
+
+				taaRenderPass.enabled = false;
+				ssaaRenderPass.enabled = false;
+				renderPass.enabled = true;
+				smaaPass.enabled = true;
+				copyPass.enabled = false;
+				// gui bind
+
+				var gui = new dat.GUI();
+				gui.add( param, 'AAEnabled', {
+					'Disabled': '0',
+					'TAA': '1',
+					'SSAA': '2',
+					'SMAA': '3',
+				} ).onFinishChange( function() {
+					if( taaRenderPass ) {
+						taaRenderPass.enabled = ( param.AAEnabled === "1" );
+						ssaaRenderPass.enabled = ( param.AAEnabled === "2" );
+						renderPass.enabled = ( param.AAEnabled === "0" || param.AAEnabled === "3" );
+						smaaPass.enabled = param.AAEnabled === "3";
+						copyPass.enabled = param.AAEnabled !== "3";
+					}
+				} );
+				gui.add( param, 'TAASampleLevel', {
+					'Level 0: 1 Sample': 0,
+					'Level 1: 2 Samples': 1,
+					'Level 2: 4 Samples': 2,
+					'Level 3: 8 Samples': 3,
+					'Level 4: 16 Samples': 4,
+					'Level 5: 32 Samples': 5
+				} ).onFinishChange( function() {
+
+					if( taaRenderPass ) {
+						taaRenderPass.sampleLevel = param.TAASampleLevel;
+					}
+
+				} );
+				gui.add( postprocessing, 'ssaoEnable' );
+				gui.add( postprocessing, 'onlyAO', false ).onChange( function( value ) { ssaoPass.onlyAO = value; } );
+				gui.add( postprocessing, 'radius' ).min( 0 ).max( 64 ).onChange( function( value ) { ssaoPass.radius = value; } );
+
+				gui.add( postprocessing, 'aoClamp' ).min( 0 ).max( 1 ).onChange( function( value ) { ssaoPass.aoClamp = value; } );
+
+				gui.add( postprocessing, 'lumInfluence' ).min( 0 ).max( 1 ).onChange( function( value ) { ssaoPass.lumInfluence = value; } );
+
+				gui.add( shadow, 'shadowEnable' );
+				gui.add( shadow, 'shadowBias' ).min( -0.01 ).max( 0 ).onChange( function( value ) { light.shadow.bias = value; renderer.needsUpdate = true; } );
+				gui.add( shadow, 'shadowRadius' ).min( 0 ).max( 2 ).onChange( function( value ) { light.shadow.radius = value; renderer.needsUpdate = true; } );
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				var pixelRatio = renderer.getPixelRatio();
+				var newWidth  = Math.floor( width * pixelRatio ) || 1;
+				var newHeight = Math.floor( height * pixelRatio ) || 1;
+				composer.setSize( newWidth, newHeight );
+
+			}
+
+			var screenCache = false;
+
+			var lastZoom = true;
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				lightHelper.update();
+
+				if ( postprocessing.ssaoEnable ) {
+					ssaoPass.enabled = true;
+				} else {
+					ssaoPass.enabled = false;
+				}
+
+				if ( shadow.shadowEnable ) {
+					light.castShadow = true;
+				} else {
+					light.castShadow = false;
+				}
+
+				var update;
+				var zoom = controls.getZoomScale();
+				if(controls.isStatic() && lastZoom == zoom) {
+					taaRenderPass.accumulate = true;
+
+					if(param.AAEnabled === "3") {
+						smaaPass.enabled = true;
+						copyPass.enabled = false;
+					}
+
+					renderer.setPixelRatio( window.devicePixelRatio );
+
+					update = false;
+					screenCache = false;
+
+				} else {
+					taaRenderPass.accumulate = false;
+
+					if(param.AAEnabled === "3") {
+						smaaPass.enabled = false;
+						copyPass.enabled = true;
+					}
+
+					renderer.setPixelRatio( 1 );
+
+					lastZoom = zoom;
+
+					update = true;
+				}
+
+				if(update || !screenCache) {
+					composer.render();
+					screenCache = true;
+				}
+
+				// renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>
