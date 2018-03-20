@@ -56,6 +56,11 @@
 		<script src="js/postprocessing/SSAOPass.js"></script>
 		<script src="js/postprocessing/SAOPass.js"></script>
 
+		<script src="js/shaders/FXAAShader.js"></script>
+		<script src="js/shaders/ConvolutionShader.js"></script>
+		<script src="js/shaders/LuminosityHighPassShader.js"></script>
+		<script src="js/postprocessing/UnrealBloomPass.js"></script>
+
 		<script src="js/libs/stats.min.js"></script>
 		<script src='js/libs/dat.gui.min.js'></script>
 
@@ -71,7 +76,16 @@
 			var postprocessing = { ssaoEnable: false, onlyAO: false, radius: 0.5, aoClamp: 0.8, lumInfluence: 1 };
 			var shadow = { shadowEnable: true, shadowBias: -0.003, shadowRadius: 0.2};
 
-			var param = { AAEnabled: "3", TAASampleLevel: 0 };
+			var param = { AAEnabled: "4", TAASampleLevel: 0 };
+
+			var bloomParams = {
+				projection: 'normal',
+				background: false,
+				exposure: 0.9,
+				bloomStrength: 1.5,
+				bloomThreshold: 0.85,
+				bloomRadius: 0.4
+			};
 
 			init();
 			animate();
@@ -161,8 +175,8 @@
 				// 抗锯齿 使用processing处理的情况下，antialias无效
 				// 因为antialias只对backbuffer生效，对framebuffer不生效
 				// 所以，在使用了其它processingpass的情况下，需要配合使用抗锯齿pass
-				renderer = new THREE.WebGLRenderer( { antialias: true } );
-				// renderer = new THREE.WebGLRenderer();
+				// renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer = new THREE.WebGLRenderer();
 
 				// 在retina屏幕上大幅提高画面质量
 				renderer.setPixelRatio( window.devicePixelRatio );
@@ -197,6 +211,13 @@
 				ssaoPass = new THREE.SSAOPass( scene, camera );
 				composer.addPass( ssaoPass );
 
+				// bloomPass = new THREE.UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 ); //1.0, 9, 0.5, 512);
+				// composer.addPass( bloomPass );
+
+				effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
+				effectFXAA.uniforms[ 'resolution' ].value.set( 1 / window.innerWidth, 1 / window.innerHeight );
+				composer.addPass( effectFXAA );
+
 				smaaPass = new THREE.SMAAPass( window.innerWidth, window.innerHeight );
 				smaaPass.enabled = true;
 				smaaPass.renderToScreen = true;
@@ -209,8 +230,10 @@
 				taaRenderPass.enabled = false;
 				ssaaRenderPass.enabled = false;
 				renderPass.enabled = true;
-				smaaPass.enabled = true;
-				copyPass.enabled = false;
+				effectFXAA.enabled = true;
+				smaaPass.enabled = false;
+				copyPass.enabled = true;
+
 				// gui bind
 
 				var gui = new dat.GUI();
@@ -219,11 +242,15 @@
 					'TAA': '1',
 					'SSAA': '2',
 					'SMAA': '3',
+					'FXAA': '4'
 				} ).onFinishChange( function() {
 					if( taaRenderPass ) {
 						taaRenderPass.enabled = ( param.AAEnabled === "1" );
 						ssaaRenderPass.enabled = ( param.AAEnabled === "2" );
-						renderPass.enabled = ( param.AAEnabled === "0" || param.AAEnabled === "3" );
+						renderPass.enabled = ( param.AAEnabled !== "1" && param.AAEnabled !== "2" );
+
+						effectFXAA.enabled = param.AAEnabled === "4";
+
 						smaaPass.enabled = param.AAEnabled === "3";
 						copyPass.enabled = param.AAEnabled !== "3";
 					}
@@ -253,6 +280,19 @@
 				gui.add( shadow, 'shadowEnable' );
 				gui.add( shadow, 'shadowBias' ).min( -0.01 ).max( 0 ).onChange( function( value ) { light.shadow.bias = value; renderer.needsUpdate = true; } );
 				gui.add( shadow, 'shadowRadius' ).min( 0 ).max( 2 ).onChange( function( value ) { light.shadow.radius = value; renderer.needsUpdate = true; } );
+
+				// gui.add( bloomParams, 'exposure', 0.1, 2 );
+				// gui.add( bloomParams, 'bloomThreshold', 0.0, 1.0 ).onChange( function ( value ) {
+				// 	bloomPass.threshold = Number( value );
+				// } );
+				//
+				// gui.add( bloomParams, 'bloomStrength', 0.0, 3.0 ).onChange( function ( value ) {
+				// 	bloomPass.strength = Number( value );
+				// } );
+				//
+				// gui.add( bloomParams, 'bloomRadius', 0.0, 1.0 ).onChange( function ( value ) {
+				// 	bloomPass.radius = Number( value );
+				// } );
 			}
 
 			function onWindowResize() {
@@ -300,6 +340,10 @@
 						copyPass.enabled = false;
 					}
 
+					if(param.AAEnabled === "4") {
+						effectFXAA.enabled = true;
+					}
+
 					renderer.setPixelRatio( window.devicePixelRatio );
 
 					update = false;
@@ -311,6 +355,10 @@
 					if(param.AAEnabled === "3") {
 						smaaPass.enabled = false;
 						copyPass.enabled = true;
+					}
+
+					if(param.AAEnabled === "4") {
+						effectFXAA.enabled = false;
 					}
 
 					renderer.setPixelRatio( 1 );
