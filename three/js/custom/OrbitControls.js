@@ -4,6 +4,7 @@
  * @author alteredq / http://alteredqualia.com/
  * @author WestLangley / http://github.com/WestLangley
  * @author erich666 / http://erichaines.com
+ * @modif
  */
 
 // This set of controls performs orbiting, dollying (zooming), and panning.
@@ -104,10 +105,13 @@ THREE.OrbitControls = function ( object, domElement ) {
 
 	};
 
+
+	// 当前旋转状态是否为空闲
 	this.isStatic = function() {
 		return state === STATE.NONE;
 	}
 
+	// 获取当前的镜头缩放值
 	this.getZoomScale = function() {
 		return spherical.radius;
 	}
