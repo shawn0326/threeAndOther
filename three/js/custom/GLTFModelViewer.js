@@ -65,7 +65,7 @@ function ModelViewer(container, options) {
     // post-processing
     this.postprocessing = options.postprocessing || {
         antialiasing: "ssaa",
-        ssao: false,
+        sao: "sao", // none, sao, ssao
         bloom: false,
         bokeh: false
     };
@@ -148,6 +148,21 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         this.ssaoPass = new THREE.SSAOPass(scene, camera);
         composer.addPass(this.ssaoPass);
 
+        this.saoPass = new THREE.SAOPass(scene, camera, undefined, undefined, new THREE.Vector2(window.innerWidth, window.innerHeight));
+        this.saoPass.params = {
+            output: 0,
+            saoBias: 0.5,
+            saoIntensity: 0.0053,
+            saoScale: 8,
+            saoKernelRadius: 100,
+            saoMinResolution: 0,
+            saoBlur: true,
+            saoBlurRadius: 8,
+            saoBlurStdDev: 4,
+            saoBlurDepthCutoff: 0.01
+        };
+        composer.addPass(this.saoPass);
+
         this.smaaPass = new THREE.SMAAPass(window.innerWidth, window.innerHeight);
         this.smaaPass.renderToScreen = true;
         composer.addPass(this.smaaPass);
@@ -189,12 +204,22 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
 
         }
 
-        this.ssaoPass.enabled = options.ssao;
+        if(options.sao == "sao") {
+            this.ssaoPass.enabled = false;
+            this.saoPass.enabled = true;
+        } else if(options.sao == "ssao") {
+            this.ssaoPass.enabled = true;
+            this.saoPass.enabled = false;
+        } else {
+            this.ssaoPass.enabled = false;
+            this.saoPass.enabled = false;
+        }
+        
     },
 
     loadModel: function(url) {
 
-        var modelScale = 0.4;
+        var modelScale =0.4;
         var scope = this;
 
         // model

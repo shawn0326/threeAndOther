@@ -1,76 +1,67 @@
-<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <script src="claygl.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="clay-viewer.js"></script>
     <script src="dat.gui.min.js"></script>
-    <title>clay</title>
 </head>
 <body>
     <style>
-        html, body, #main {
-            height: 100%;
+        body {
             margin: 0;
+            background: url(bg.jpg);
+            background-size: 100% 100%;
+            /* background: #000; */
+        }
+        #main {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+        }
+        .tip {
+            width:20px;
+            height:20px;
+            border-radius:20px;
+            background-color:#000;
+            border: 2px solid #fff;
+            opacity: 0.8;
+            text-align:center;
+            line-height: 20px;
+            color: #fff;
+            cursor: pointer;
         }
     </style>
-    <canvas id="main"></canvas>
-    <script>
-        // var app = clay.application.create('#main', {
-        //     graphic: {
-        //         shadow: true
-        //     },
-        //     init: function (app) {
-        //         // Create camera
-        //         this._camera = app.createCamera([100, 100, 100], [0, 0, 0]);
-        //
-        //         // Load boombox model.
-        //         app.loadModel('../res/uinv/scene.gltf').then(function(model) {
-        //             app.scene.traverse(function(mesh) {
-        //                 mesh.castShadow = true;
-        //             });
-        //         });
-        //
-        //         app._shadowPass.shadowBlur = 0.2;
-        //
-        //         app.createAmbientLight("#fff", 0.3);
-        //
-        //         // Create light
-        //         var light = app.createDirectionalLight([-1, -1, -1], "#fff", 0.7);
-        //         light.castShadow = true;
-        //
-        //         // Use orbit control
-        //         this._control = new clay.plugin.OrbitControl({
-        //             target: this._camera,
-        //             domElement: app.container
-        //         });
-        //     },
-        //
-        //     loop: function (app) {
-        //         this._control.update(app.frameTime);
-        //     }
-        // });
-        //
-        // window.onresize = function () {
-        //     app.resize()
-        // };
+    <div id="main"></div>
 
+    <script type="text/javascript">
+        var posteffect = {
+            enable: true,
+            screenSpaceAmbientOcclusion: {
+                // Enable screen space ambient occulusion
+                enable: true,
+                intensity: 1,
+                radius: 0.5
+            }
+        }
         var viewer = new ClayViewer(document.getElementById('main'), {
-            shadow: false,
+            shadow: true,
             // ambientCubemapLight: {
             //     intensity: 1,
             //     texture: './asset/texture/pisa.hdr'
             // },
-            postEffect: {
-                enable: false
-            }
+            ground: {
+                show: true,
+
+                grid: true
+            },
+            postEffect: posteffect
         });
 
         var modelUrl = location.search.slice(1);
 
-        viewer.loadModel('asset/DamagedHelmet/DamagedHelmet.gltf')
+        viewer.loadModel('../res/uinv/scene.gltf')
             .on('loadmodel', function (modelStat) {
                 viewer.setCameraControl({
                     alpha: 20,
@@ -126,6 +117,9 @@
         gui.add(config, 'lightAlpha', 0, 180).onChange(updateLight);
         gui.add(config, 'lightBeta', -180, 180).onChange(updateLight);
         gui.add(config, 'ambientIntensity', 0, 2).onChange(updateLight);
+        gui.add(posteffect.screenSpaceAmbientOcclusion, 'enable',).onChange(function() {
+            viewer.setPostEffect(posteffect);
+        });
 
         updateLight();
     </script>

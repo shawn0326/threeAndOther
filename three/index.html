@@ -132,7 +132,7 @@
 		viewer.ssaoPass.radius = 2;
 		viewer.ssaoPass.aoClamp = 0.25;
 		viewer.ssaoPass.lumInfluence = 0.7;
-		gui.add(viewer.postprocessing, 'ssao').onFinishChange(function() {
+		gui.add(viewer.postprocessing, 'sao', ["none", "sao", "ssao"]).onFinishChange(function() {
 			viewer.screenCache = false;
 		});;
 		var gui3 = gui.addFolder("ssao");
@@ -150,6 +150,45 @@
 		});
 		gui3.add(params, 'lumInfluence').min(0).max(1).onChange(function(value) {
 			viewer.ssaoPass.lumInfluence = value;
+			viewer.screenCache = false;
+		});
+
+		var gui5 = gui.addFolder("sao");
+		gui5.add(viewer.saoPass.params, 'output', {
+			'Beauty': THREE.SAOPass.OUTPUT.Beauty,
+			'Beauty+SAO': THREE.SAOPass.OUTPUT.Default,
+			'SAO': THREE.SAOPass.OUTPUT.SAO,
+			'Depth': THREE.SAOPass.OUTPUT.Depth,
+			'Normal': THREE.SAOPass.OUTPUT.Normal
+		}).onFinishChange(function(value) {
+			viewer.saoPass.params.output = parseInt( value );
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoBias').min(0).max(1).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoIntensity').min(0.001).max(0.02).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoScale').min(1).max(20).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoKernelRadius').min(20).max(200).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoMinResolution').min(0).max(1).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoBlur').onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoBlurRadius').min(0).max(200).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoBlurStdDev').min(0).max(150).onFinishChange(function(value) {
+			viewer.screenCache = false;
+		});
+		gui5.add(viewer.saoPass.params, 'saoBlurDepthCutoff').min(0).max(0.1).onFinishChange(function(value) {
 			viewer.screenCache = false;
 		});
 

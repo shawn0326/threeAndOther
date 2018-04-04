@@ -5250,14 +5250,14 @@ var globalObject = typeof self !== "undefined" ? self :
     this !== undefined ? this : null;
 
 function tryCatcher() {
-    try {
+    // try {
         var target = tryCatchTarget;
         tryCatchTarget = null;
         return target.apply(this, arguments);
-    } catch (e) {
-        errorObj.e = e;
-        return errorObj;
-    }
+    // } catch (e) {
+    //     errorObj.e = e;
+    //     return errorObj;
+    // }
 }
 function tryCatch(fn) {
     tryCatchTarget = fn;

@@ -18,7 +18,7 @@ var main = function() {
     viewer.setupManipulator();
     viewer.run();
 
-    var modelURL = '../res/single_floor/scene.gltf';
+    var modelURL = '../res/uinv/scene.gltf';
     var request = osgDB.readNodeURL(modelURL);
 
     request
