@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="claygl.js"></script>
+    <script src="clay-viewer.js"></script>
+    <script src="dat.gui.min.js"></script>
+    <title>clay</title>
+</head>
+<body>
+    <style>
+        html, body, #main {
+            height: 100%;
+            margin: 0;
+        }
+    </style>
+    <canvas id="main"></canvas>
+    <script>
+        // var app = clay.application.create('#main', {
+        //     graphic: {
+        //         shadow: true
+        //     },
+        //     init: function (app) {
+        //         // Create camera
+        //         this._camera = app.createCamera([100, 100, 100], [0, 0, 0]);
+        //
+        //         // Load boombox model.
+        //         app.loadModel('../res/uinv/scene.gltf').then(function(model) {
+        //             app.scene.traverse(function(mesh) {
+        //                 mesh.castShadow = true;
+        //             });
+        //         });
+        //
+        //         app._shadowPass.shadowBlur = 0.2;
+        //
+        //         app.createAmbientLight("#fff", 0.3);
+        //
+        //         // Create light
+        //         var light = app.createDirectionalLight([-1, -1, -1], "#fff", 0.7);
+        //         light.castShadow = true;
+        //
+        //         // Use orbit control
+        //         this._control = new clay.plugin.OrbitControl({
+        //             target: this._camera,
+        //             domElement: app.container
+        //         });
+        //     },
+        //
+        //     loop: function (app) {
+        //         this._control.update(app.frameTime);
+        //     }
+        // });
+        //
+        // window.onresize = function () {
+        //     app.resize()
+        // };
+
+        var viewer = new ClayViewer(document.getElementById('main'), {
+            shadow: false,
+            // ambientCubemapLight: {
+            //     intensity: 1,
+            //     texture: './asset/texture/pisa.hdr'
+            // },
+            postEffect: {
+                enable: false
+            }
+        });
+
+        var modelUrl = location.search.slice(1);
+
+        viewer.loadModel('asset/DamagedHelmet/DamagedHelmet.gltf')
+            .on('loadmodel', function (modelStat) {
+                viewer.setCameraControl({
+                    alpha: 20,
+                    beta: 30
+                });
+                viewer.start();
+
+                var dom = viewer.addHotspot([5, 2, 0], `
+                    <div class="tip">1</div>
+                `);
+                dom.addEventListener('click', function () {
+                    alert('Do something');
+                });
+
+                console.log('Model loaded:');
+                console.log('三角面：', modelStat.triangleCount);
+                console.log('顶点：', modelStat.vertexCount);
+                console.log('场景节点：', modelStat.nodeCount);
+                console.log('Mesh：', modelStat.meshCount);
+                console.log('材质：', modelStat.materialCount);
+                console.log('纹理：', modelStat.textureCount);
+            })
+            .on('ready', function () {
+                console.log('all loaded');
+            })
+            .on('error', function () {
+                console.log('Model load error');
+            });
+
+        var config = {
+            lightIntensity: 1,
+            lightColor: '#fff',
+            lightAlpha: 45,
+            lightBeta: 45,
+            ambientIntensity: 1
+        }
+        var gui = new dat.GUI();
+
+        function updateLight() {
+            viewer.setMainLight({
+                intensity: config.lightIntensity,
+                color: config.lightColor,
+                alpha: config.lightAlpha,
+                beta: config.lightBeta
+            });
+            viewer.setAmbientCubemapLight({
+                specularIntensity: config.ambientIntensity,
+                diffuseIntensity: config.ambientIntensity
+            });
+        }
+        gui.add(config, 'lightIntensity', 0, 4).onChange(updateLight);
+        gui.addColor(config, 'lightColor').onChange(updateLight);
+        gui.add(config, 'lightAlpha', 0, 180).onChange(updateLight);
+        gui.add(config, 'lightBeta', -180, 180).onChange(updateLight);
+        gui.add(config, 'ambientIntensity', 0, 2).onChange(updateLight);
+
+        updateLight();
+    </script>
+</body>
+</html>

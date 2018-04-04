@@ -9,7 +9,13 @@ the aim of this project is: create a GLTF Model Renderer based on threejs.
 * three文件夹来存放three.js的示例。(js/custom文件夹存放自定义的three相关类)
 * 其它示例如OSG.js可以存放在单独的OSG文件夹中。
 
-### 经验
+### 相关库
+
+[three.js](https://github.com/mrdoob/three.js) |
+[claygl](https://github.com/pissang/claygl) |
+[osgjs](https://github.com/cedricpinson/osgjs)
+
+### 经验（three.js）
 
 为了达到比较好渲染效果，需要用到以下几个功能：
 
