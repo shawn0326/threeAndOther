@@ -64,8 +64,8 @@ function ModelViewer(container, options) {
 
     // post-processing
     this.postprocessing = options.postprocessing || {
-        antialiasing: "ssaa",
-        sao: "sao", // none, sao, ssao
+        antialiasing: "none",
+        sao: "superssao", // none, sao, ssao, superssao
         bloom: false,
         bokeh: false
     };
@@ -163,6 +163,9 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         };
         composer.addPass(this.saoPass);
 
+        this.superSSAOPass = new THREE.SuperSSAOPass(scene, camera, new THREE.Vector2(window.innerWidth, window.innerHeight));
+        composer.addPass(this.superSSAOPass);
+
         this.smaaPass = new THREE.SMAAPass(window.innerWidth, window.innerHeight);
         this.smaaPass.renderToScreen = true;
         composer.addPass(this.smaaPass);
@@ -207,12 +210,19 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         if(options.sao == "sao") {
             this.ssaoPass.enabled = false;
             this.saoPass.enabled = true;
+            this.superSSAOPass.enabled = false;
         } else if(options.sao == "ssao") {
             this.ssaoPass.enabled = true;
             this.saoPass.enabled = false;
+            this.superSSAOPass.enabled = false;
+        } else if(options.sao == "superssao") {
+            this.ssaoPass.enabled = false;
+            this.saoPass.enabled = false;
+            this.superSSAOPass.enabled = true;
         } else {
             this.ssaoPass.enabled = false;
             this.saoPass.enabled = false;
+            this.superSSAOPass.enabled = false;
         }
         
     },
@@ -300,9 +310,11 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
             this.screenCache = true;
         }
 
-        if (needRender || taaRender) {
-            this.composer.render();
-        }
+        // if (needRender || taaRender) {
+        //     this.composer.render();
+        // }
+
+        this.composer.render();
     }
 
 });

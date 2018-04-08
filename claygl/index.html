@@ -59,6 +59,10 @@
             postEffect: posteffect
         });
 
+        viewer._renderMain.setTemporalSuperSampling({
+            enable: false
+        });
+
         var modelUrl = location.search.slice(1);
 
         viewer.loadModel('../res/uinv/scene.gltf')

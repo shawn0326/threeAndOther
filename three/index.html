@@ -68,6 +68,9 @@
 	<script src="js/custom/OrbitControls.js"></script>
 	<script src="js/custom/GLTFModelViewer.js"></script>
 
+	<script src="js/custom/SuperSSAOShader.js"></script>
+	<script src="js/custom/SuperSSAOPass.js"></script>
+
 	<!-- <script src="js/shaders/BokehShader.js"></script>
 		<script src="js/postprocessing/BokehPass.js"></script> -->
 
@@ -132,7 +135,7 @@
 		viewer.ssaoPass.radius = 2;
 		viewer.ssaoPass.aoClamp = 0.25;
 		viewer.ssaoPass.lumInfluence = 0.7;
-		gui.add(viewer.postprocessing, 'sao', ["none", "sao", "ssao"]).onFinishChange(function() {
+		gui.add(viewer.postprocessing, 'sao', ["none", "sao", "ssao", "superssao"]).onFinishChange(function() {
 			viewer.screenCache = false;
 		});;
 		var gui3 = gui.addFolder("ssao");
