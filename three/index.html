@@ -91,7 +91,8 @@
 		document.body.appendChild(container);
 
 		var viewer = new ModelViewer(container, {
-			envMap: envMap
+			envMap: envMap,
+			lightHelper: false
 		});
 
 		viewer.loadModel("../res/uinv/scene.gltf").addEventListener("modelLoaded", function() {
@@ -167,31 +168,46 @@
 			viewer.saoPass.params.output = parseInt( value );
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoBias').min(0).max(1).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoBias').min(0).max(1).onChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoIntensity').min(0.001).max(0.02).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoIntensity').min(0.001).max(0.02).onChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoScale').min(1).max(20).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoScale').min(1).max(20).onChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoKernelRadius').min(20).max(200).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoKernelRadius').min(20).max(200).onChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoMinResolution').min(0).max(1).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoMinResolution').min(0).max(1).onChange(function(value) {
 			viewer.screenCache = false;
 		});
 		gui5.add(viewer.saoPass.params, 'saoBlur').onFinishChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoBlurRadius').min(0).max(200).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoBlurRadius').min(0).max(200).onChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoBlurStdDev').min(0).max(150).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoBlurStdDev').min(0).max(150).onChange(function(value) {
 			viewer.screenCache = false;
 		});
-		gui5.add(viewer.saoPass.params, 'saoBlurDepthCutoff').min(0).max(0.1).onFinishChange(function(value) {
+		gui5.add(viewer.saoPass.params, 'saoBlurDepthCutoff').min(0).max(0.1).onChange(function(value) {
+			viewer.screenCache = false;
+		});
+
+		var superssaoParams = {radius:0.5, bias: 0.01, intensity: 0.5};
+		var gui6 = gui.addFolder("superssao");
+		gui6.add(superssaoParams, 'radius').min(0).max(50).onChange(function(value) {
+			viewer.superSSAOPass.setParameter('radius', value);
+			viewer.screenCache = false;
+		});
+		gui6.add(superssaoParams, 'bias').min(0).max(1).onChange(function(value) {
+			viewer.superSSAOPass.setParameter('bias', value);
+			viewer.screenCache = false;
+		});
+		gui6.add(superssaoParams, 'intensity').min(0).max(1).onChange(function(value) {
+			viewer.superSSAOPass.setParameter('intensity', value);
 			viewer.screenCache = false;
 		});
 

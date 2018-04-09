@@ -1,6 +1,7 @@
 'use strict';
 
 // 生成一张随机噪声图的数据
+// 返回的数组为Uint8Array，长度为 size * size * 4
 function generateNoiseData(size) {
     var data = new Uint8Array(size * size * 4);
     var n = 0;
@@ -31,8 +32,9 @@ function generateNoiseTexture(size) {
 
 // Generate halton sequence
 // https://en.wikipedia.org/wiki/Halton_sequence
+// halton数列，用来产生0-1的均匀分布的一组数据
+// index 为采样位置，base为基数（任意质数）
 function halton(index, base) {
-
     var result = 0;
     var f = 1 / base;
     var i = index;
@@ -44,13 +46,16 @@ function halton(index, base) {
     return result;
 }
 
-// 生成采样偏移数组，size为采样次数
+// 生成采样偏移数组
+// size为采样次数
+// offset 为偏移值，传入不同的偏移可以生成不同的分布数
+// hemisphere 代表phi的范围是否在0~180内，否则生成在0-360内
 function generateKernel(size, offset, hemisphere) {
     var kernel = new Float32Array(size * 3);
     offset = offset || 0;
     for (var i = 0; i < size; i++) {
-        var phi = halton(i + offset, 2) * (hemisphere ? 1 : 2) * Math.PI;
-        var theta = halton(i + offset, 3) * Math.PI;
+        var phi = halton(i + offset, 2) * (hemisphere ? 1 : 2) * Math.PI; // phi是方位面（水平面）内的角度
+        var theta = halton(i + offset, 3) * Math.PI; // theta是俯仰面（竖直面）内的角度
         var r = Math.random();
         var x = Math.cos(phi) * Math.sin(theta) * r;
         var y = Math.cos(theta) * r;
@@ -63,8 +68,9 @@ function generateKernel(size, offset, hemisphere) {
     return kernel;
 }
 
+// 优化的 ssao pass，实现细节参考 clay-view
+// resolution 为屏幕分辨率
 THREE.SuperSSAOPass = function (scene, camera, resolution) {
-
     THREE.Pass.call( this );
 
     this.scene = scene;
@@ -81,9 +87,8 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 		format: THREE.RGBAFormat
 	} );
 	this.blurIntermediateRenderTarget = this.ssaoRenderTarget.clone();
-	this.beautyRenderTarget = this.ssaoRenderTarget.clone();
 
-    // TODO normal depth 是否可以压缩到一张纹理当中？
+    // TODO normal depth 是否可以压缩到一张纹理当中，以减少绘制的开销？
 	this.normalRenderTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, {
 		minFilter: THREE.NearestFilter,
 		magFilter: THREE.NearestFilter,
@@ -111,6 +116,8 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 		uniforms: THREE.UniformsUtils.clone( THREE.SuperSSAOShader.uniforms )
     } );
     this.ssaoMaterial.blending = THREE.NoBlending;
+    this.ssaoMaterial.uniforms["tDepth"].value = this.depthRenderTarget.texture;
+    this.ssaoMaterial.uniforms["tNormal"].value = this.normalRenderTarget.texture;
 
     this.blurMaterial = new THREE.ShaderMaterial( {
 		defines: Object.assign( {}, THREE.SuperSSAOBlurShader.defines ),
@@ -119,38 +126,8 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 		uniforms: THREE.UniformsUtils.clone( THREE.SuperSSAOBlurShader.uniforms )
     } );
     this.blurMaterial.blending = THREE.NoBlending;
-
-    if ( THREE.DepthLimitedBlurShader === undefined ) {
-
-		console.error( 'THREE.SuperSSAOPass relies on THREE.DepthLimitedBlurShader' );
-
-	}
-
-	this.vBlurMaterial = new THREE.ShaderMaterial( {
-		uniforms: THREE.UniformsUtils.clone( THREE.DepthLimitedBlurShader.uniforms ),
-		defines: Object.assign( {}, THREE.DepthLimitedBlurShader.defines ),
-		vertexShader: THREE.DepthLimitedBlurShader.vertexShader,
-		fragmentShader: THREE.DepthLimitedBlurShader.fragmentShader
-	} );
-	this.vBlurMaterial.defines[ 'DEPTH_PACKING' ] = 1;
-	this.vBlurMaterial.defines[ 'PERSPECTIVE_CAMERA' ] = 1;
-	this.vBlurMaterial.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
-	this.vBlurMaterial.uniforms[ 'tDepth' ].value = this.depthRenderTarget.texture;
-	this.vBlurMaterial.uniforms[ 'size' ].value.set( this.resolution.x, this.resolution.y );
-	this.vBlurMaterial.blending = THREE.NoBlending;
-
-	this.hBlurMaterial = new THREE.ShaderMaterial( {
-		uniforms: THREE.UniformsUtils.clone( THREE.DepthLimitedBlurShader.uniforms ),
-		defines: Object.assign( {}, THREE.DepthLimitedBlurShader.defines ),
-		vertexShader: THREE.DepthLimitedBlurShader.vertexShader,
-		fragmentShader: THREE.DepthLimitedBlurShader.fragmentShader
-	} );
-	this.hBlurMaterial.defines[ 'DEPTH_PACKING' ] = 1;
-	this.hBlurMaterial.defines[ 'PERSPECTIVE_CAMERA' ] = 1;
-	this.hBlurMaterial.uniforms[ 'tDiffuse' ].value = this.blurIntermediateRenderTarget.texture;
-	this.hBlurMaterial.uniforms[ 'tDepth' ].value = this.depthRenderTarget.texture;
-	this.hBlurMaterial.uniforms[ 'size' ].value.set( this.resolution.x, this.resolution.y );
-	this.hBlurMaterial.blending = THREE.NoBlending;
+    this.blurMaterial.uniforms[ 'normalTex' ].value = this.normalRenderTarget.texture;
+    this.blurMaterial.uniforms[ 'depthTex' ].value = this.depthRenderTarget.texture;
 
     if ( THREE.CopyShader === undefined ) {
 
@@ -181,8 +158,6 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 	this.materialCopy.blendSrcAlpha = THREE.ZeroFactor;
 	this.materialCopy.blendDstAlpha = THREE.SrcColorFactor;
 	this.materialCopy.blendEquationAlpha = THREE.AddEquation;
-    
-    // TODO blur
 
     this.quadCamera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
 	this.quadScene = new THREE.Scene();
@@ -193,11 +168,13 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
     this.oldClearAlpha = 1;
     
     this.setNoiseSize(4);
-    this.setKernelSize(32);
+    this.setKernelSize(12);
 
-    this.setParameter('blurSize', 5);
-    this.setParameter('radius', 1);
+    this.setParameter('radius', 0.5);
+    this.setParameter('bias', 0.5 / 50);
     this.setParameter('power', 1);
+
+    this.onlyAO = false;
 }
 
 THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
@@ -207,12 +184,14 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
 
         // 因为此pass配置为不需要swapBuffer，所以绘制效果直接绘制在readBuffer上
         // 因此，如果需要绘制在屏幕上，则需要执行一次copy
-        if(this.renderToScreen) {
+        if(this.renderToScreen && !this.onlyAO) {
             this.materialCopy.blending = THREE.NoBlending;
 			this.materialCopy.uniforms[ 'tDiffuse' ].value = readBuffer.texture;
 			this.materialCopy.needsUpdate = true;
 			this.renderPass( renderer, this.materialCopy, null );
         }
+
+        this.onlyAO && renderer.clear(true, true, true);
 
         // save renderer clear states
         this.oldClearColor.copy( renderer.getClearColor() );
@@ -226,42 +205,23 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
         this.renderOverride( renderer, this.normalMaterial, this.normalRenderTarget, 0x7777ff, 1.0 );
         
         // draw ssao
-        this.ssaoMaterial.uniforms["tDepth"].value = this.depthRenderTarget.texture;
-        this.ssaoMaterial.uniforms["tNormal"].value = this.normalRenderTarget.texture;
         this.ssaoMaterial.uniforms["gBufferTexSize"].value.copy(this.resolution);
         this.ssaoMaterial.uniforms['projection'].value.copy( this.camera.projectionMatrix );
         this.ssaoMaterial.uniforms['projectionInv'].value.getInverse( this.camera.projectionMatrix );
         this.ssaoMaterial.uniforms['viewInverseTranspose'].value.copy( this.camera.matrixWorld ).transpose();
         this.renderPass( renderer, this.ssaoMaterial, this.ssaoRenderTarget, 0xffffff, 1.0 );
-
+        
         // blur
-        var depthCutoff = 0.01 * ( this.camera.far - this.camera.near );
-		this.vBlurMaterial.uniforms[ 'depthCutoff' ].value = depthCutoff;
-		this.hBlurMaterial.uniforms[ 'depthCutoff' ].value = depthCutoff;
+        this.blurMaterial.uniforms[ 'textureSize' ].value.copy(this.resolution);
+        this.blurMaterial.uniforms['projection'].value.copy( this.camera.projectionMatrix );
 
-		this.vBlurMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
-		this.vBlurMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
-		this.hBlurMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
-        this.hBlurMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
-        
-        var blurRadius = 15;
-        var stdDev = 5;
+        this.blurMaterial.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
+        this.blurMaterial.uniforms[ 'direction' ].value = 0;
+        this.renderPass( renderer, this.blurMaterial, this.blurIntermediateRenderTarget, 0xffffff, 1.0 );
 
-		if ( ( this.prevStdDev !== stdDev ) || ( this.prevNumSamples !== blurRadius ) ) {
-
-			THREE.BlurShaderUtils.configure( this.vBlurMaterial, blurRadius, stdDev, new THREE.Vector2( 0, 1 ) );
-			THREE.BlurShaderUtils.configure( this.hBlurMaterial, blurRadius, stdDev, new THREE.Vector2( 1, 0 ) );
-			this.prevStdDev = stdDev;
-			this.prevNumSamples = blurRadius;
-
-        }
-        
-        // this.renderPass( renderer, this.vBlurMaterial, this.blurIntermediateRenderTarget, 0xffffff, 1.0 );
-        // this.renderPass( renderer, this.hBlurMaterial, this.ssaoRenderTarget, 0xffffff, 1.0 );
-        
-        // this.blurMaterial.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
-        // this.blurMaterial.uniforms[ 'textureSize' ].value.copy(this.resolution);
-        // this.renderPass( renderer, this.blurMaterial, this.blurIntermediateRenderTarget, 0xffffff, 1.0 );
+        this.blurMaterial.uniforms[ 'tDiffuse' ].value = this.blurIntermediateRenderTarget.texture;
+        this.blurMaterial.uniforms[ 'direction' ].value = 1;
+        this.renderPass( renderer, this.blurMaterial, this.ssaoRenderTarget, 0xffffff, 1.0 );
         
         // copy
         this.materialCopy.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
@@ -326,13 +286,13 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
 		// restore original state
 		renderer.autoClear = originalAutoClear;
 		renderer.setClearColor( originalClearColor );
-		renderer.setClearAlpha( originalClearAlpha );
-
+        renderer.setClearAlpha( originalClearAlpha );
+        
 	},
 
     setKernelSize: function(size) {
         this.ssaoMaterial.defines["KERNEL_SIZE"] = size;
-        this.ssaoMaterial.uniforms["kernel"].value = generateKernel(size);
+        this.ssaoMaterial.uniforms["kernel"].value = generateKernel(size, undefined, true);
     },
 
     setNoiseSize: function(size) {
@@ -358,7 +318,7 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
             this.setKernelSize(val);
         }
         else if (name === 'blurSize') {
-            this.blurMaterial.defines['BLUR_SIZE'] = val;
+            this.ssaoMaterial.uniforms['blurSize'].value = val;
         }
         else {
             this.ssaoMaterial.uniforms[name].value = val;

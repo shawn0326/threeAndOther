@@ -6,8 +6,8 @@ function ModelViewer(container, options) {
 
     options = options || {};
 
-    var camera = this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-    this.camera.position.set(80, 80, 80);
+    var camera = this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    this.camera.position.set(10, 10, 10);
     this.camera.lookAt(0, 0, 0);
 
     this.controls = new THREE.OrbitControls(camera, container);
@@ -18,28 +18,29 @@ function ModelViewer(container, options) {
     this.scene.background = options.envMap || null;
 
     // 模拟大气散射的半球光
-    var scatteredLight = new THREE.HemisphereLight(0xcccccc, 0x999999);
+    var scatteredLight = new THREE.HemisphereLight(0xcccccc, 0xcccccc);
     scatteredLight.position.set(0, 1, 0);
     scene.add(scatteredLight);
 
     // 主要灯光
     var mainLight = this.mainlight = new THREE.DirectionalLight(0xffffff);
-    mainLight.position.set(50, 30, 40);
+    mainLight.position.set(10, 10, 10);
     mainLight.castShadow = true;
     mainLight.shadow.mapSize.width = 1024;
     mainLight.shadow.mapSize.height = 1024;
-    mainLight.shadow.camera.near = 5; // default
-    mainLight.shadow.camera.far = 200;
-    var shadowSize = 100;
+    mainLight.shadow.camera.near = 1; // default
+    mainLight.shadow.camera.far = 100;
+    var shadowSize = 20;
     mainLight.shadow.camera.left = -shadowSize;
     mainLight.shadow.camera.right = shadowSize;
     mainLight.shadow.camera.top = shadowSize;
     mainLight.shadow.camera.bottom = -shadowSize;
-    // light.intensity = 0.8;
+    mainLight.shadow.bias = -0.003;
+    mainLight.intensity = 1;
     scene.add(mainLight);
     // 灯光照向模型
     scene.add(mainLight.target);
-    mainLight.target.position.set(20, 0, 20);
+    mainLight.target.position.set(0, 0, 0);
 
     // 灯光辅助线
     if (options.lightHelper) {
@@ -164,6 +165,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         composer.addPass(this.saoPass);
 
         this.superSSAOPass = new THREE.SuperSSAOPass(scene, camera, new THREE.Vector2(window.innerWidth, window.innerHeight));
+        this.superSSAOPass.setParameter('intensity', 0.5);
         composer.addPass(this.superSSAOPass);
 
         this.smaaPass = new THREE.SMAAPass(window.innerWidth, window.innerHeight);
@@ -229,7 +231,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
 
     loadModel: function(url) {
 
-        var modelScale =0.4;
+        var modelScale = 0.0178; // TODO 根据模型的包围盒计算
         var scope = this;
 
         // model
@@ -267,7 +269,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
     loop: function() {
         requestAnimationFrame(this.meLoop);
 
-        this.lightHelper && lightHelper.update();
+        this.lightHelper && this.lightHelper.update();
 
         var postprocessing = this.postprocessing;
 

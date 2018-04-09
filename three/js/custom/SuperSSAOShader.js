@@ -1,6 +1,4 @@
 /**
- * @author shawn / http://www.halflab.me
- *
  * Super SSAO shader
  */
 
@@ -18,14 +16,15 @@ THREE.SuperSSAOShader = {
 		'tNormal': { value: null },
 		'noiseTex': { value: null },
 		'gBufferTexSize': { value: new THREE.Vector2() },
-		'noiseTexSize': { value: new THREE.Vector2(512, 512) },
+		'noiseTexSize': { value: new THREE.Vector2(4, 4) },
 		'projection': { value: new THREE.Matrix4() },
 		'projectionInv': { value: new THREE.Matrix4() },
 		'viewInverseTranspose': { value: new THREE.Matrix4() },
 		'kernel': {value: null},
-		'radius': {value: 1.5},
-		'power': {value: 2},
-		'bias': {value: 0.01}
+		'radius': {value: 1},
+		'power': {value: 1},
+		'bias': {value: 0.01},
+		'intensity': {value: 1}
     },
 
 	vertexShader: [
@@ -70,13 +69,15 @@ THREE.SuperSSAOShader = {
 
 		"uniform float bias;",
 
+		"uniform float intensity;",
+
 		"#include <packing>",
 
 		"float getDepth( const in vec2 screenPosition ) {",
 		"	#if DEPTH_PACKING == 1",
-		"	return 1.0 - unpackRGBAToDepth( texture2D( tDepth, screenPosition ) );",
+		"	return unpackRGBAToDepth( texture2D( tDepth, screenPosition ) );",
 		"	#else",
-		"	return 1.0 - texture2D( tDepth, screenPosition ).x;",
+		"	return texture2D( tDepth, screenPosition ).x;",
 		"	#endif",
 		"}",
 
@@ -95,11 +96,13 @@ THREE.SuperSSAOShader = {
 				"texCoord.xy /= texCoord.w;",
 		
 				"float sampleDepth = getDepth(texCoord.xy * 0.5 + 0.5);",
+				"float z = sampleDepth * 2.0 - 1.0;",
 		
-				"sampleDepth = projection[3][2] / (sampleDepth * projection[2][3] - projection[2][2]);",
+				// just for perspective camera
+				"z = projection[3][2] / (z * projection[2][3] - projection[2][2]);",
 		
-				"float rangeCheck = smoothstep(0.0, 1.0, radius / abs(originPos.z - sampleDepth));",
-				"occlusion += rangeCheck * step(samplePos.z, sampleDepth - bias);",
+				"float rangeCheck = smoothstep(0.0, 1.0, radius / abs(originPos.z - z));",
+				"occlusion += rangeCheck * step(samplePos.z, z - bias);",
 			"}",
 			"occlusion = 1.0 - occlusion / float(KERNEL_SIZE);",
 			"return pow(occlusion, power);",
@@ -116,11 +119,6 @@ THREE.SuperSSAOShader = {
 		
 			// Convert to view space
 			// "N = (viewInverseTranspose * vec4(N, 0.0)).xyz;",
-
-			"vec4 projectedPos = vec4(vUv * 2.0 - 1.0, centerDepth, 1.0);",
-			"vec4 p4 = projectionInv * projectedPos;",
-		
-			"vec3 position = p4.xyz / p4.w;",
 		
 			"vec2 noiseTexCoord = gBufferTexSize / vec2(noiseTexSize) * vUv;",
 			"vec3 rvec = texture2D(noiseTex, noiseTexCoord).rgb * 2.0 - 1.0;",
@@ -130,18 +128,16 @@ THREE.SuperSSAOShader = {
 			// Bitangent
 			"vec3 BT = normalize(cross(N, T));",
 			"mat3 kernelBasis = mat3(T, BT, N);",
+
+			// view position
+			"float z = centerDepth * 2.0 - 1.0;",
+			"vec4 projectedPos = vec4(vUv * 2.0 - 1.0, z, 1.0);",
+			"vec4 p4 = projectionInv * projectedPos;",
+			"vec3 position = p4.xyz / p4.w;",
 		
 			"float ao = ssaoEstimator(kernelBasis, position);",
-			"ao = clamp(1.0 - (1.0 - ao) * 1.0, 0.0, 1.0);",
+			"ao = clamp(1.0 - (1.0 - ao) * intensity, 0.0, 1.0);",
 			"gl_FragColor = vec4(vec3(ao), 1.0);",
-
-			// "gl_FragColor = vec4( 1.0, 0.0, 0.0, 0.5 );",
-
-			// "gl_FragColor = texture2D( tDepth, vUv );",
-
-			// "gl_FragColor = texture2D( tNormal, vUv );",
-
-			// "gl_FragColor = texture2D( noiseTex, vUv );",
 
 		"}"
 
@@ -152,12 +148,20 @@ THREE.SuperSSAOShader = {
 THREE.SuperSSAOBlurShader = {
 
 	defines: {
-		'BLUR_SIZE': 4
+		'NORMALTEX_ENABLED': 1,
+		'DEPTHTEX_ENABLED': 1,
+		'DEPTH_PACKING': 1
 	},
 
 	uniforms: {
 		'tDiffuse': { value: null },
-		'textureSize': { value: new THREE.Vector2()}
+		'textureSize': { value: new THREE.Vector2()},
+		'direction': { value: 0},
+		'blurSize': {value: 1},
+		'depthTex': { value: null },
+		'normalTex': { value: null },
+		'projection': { value: new THREE.Matrix4() },
+		'depthRange': { value: 0.05}
 	},
 	
 	vertexShader: [
@@ -176,11 +180,44 @@ THREE.SuperSSAOBlurShader = {
 
 	fragmentShader: [
 
+		"#include <packing>",
+
 		"varying vec2 vUv;",
 
 		"uniform vec2 textureSize;",
+		"uniform float blurSize;",
 
 		"uniform sampler2D tDiffuse;",
+
+		// 0 horizontal, 1 vertical
+		"uniform int direction;",
+
+		"#ifdef NORMALTEX_ENABLED",
+			"uniform sampler2D normalTex;",
+			"vec3 getViewNormal( const in vec2 screenPosition ) {",
+			"	return unpackRGBToNormal( texture2D( normalTex, screenPosition ).xyz );",
+			"}",
+		"#endif",
+
+		"#ifdef DEPTHTEX_ENABLED",
+			"uniform sampler2D depthTex;",
+			"uniform mat4 projection;",
+			"uniform float depthRange;",
+
+			"float getDepth( const in vec2 screenPosition ) {",
+			"	#if DEPTH_PACKING == 1",
+			"	return unpackRGBAToDepth( texture2D( depthTex, screenPosition ) );",
+			"	#else",
+			"	return texture2D( depthTex, screenPosition ).x;",
+			"	#endif",
+			"}",
+
+			"float getLinearDepth(vec2 coord)",
+			"{",
+				"float depth = getDepth(coord) * 2.0 - 1.0;",
+				"return projection[3][2] / (depth * projection[2][3] - projection[2][2]);",
+			"}",
+		"#endif",
 
 		"void main() {",
 
@@ -191,25 +228,43 @@ THREE.SuperSSAOBlurShader = {
 			"kernel[3] = 0.233062;",
 			"kernel[4] = 0.122581;",
 
-			"vec2 texelSize = 1.0 / textureSize;",
+			"vec2 off = vec2(0.0);",
+			"if (direction == 0) {",
+				"off[0] = blurSize / textureSize.x;",
+			"}",
+			"else {",
+				"off[1] = blurSize / textureSize.y;",
+			"}",
 
-			"vec4 color = vec4(0.0);",
-			"vec4 centerColor = texture2D(tDiffuse, vUv);",
+			"float sum = 0.0;",
 			"float weightAll = 0.0;",
-			"for (int x = 0; x < 5; x++) {",
-				"for (int y = 0; y < 5; y++) {",
-					"vec2 coord = (vec2(float(x) - 2.0, float(y) - 2.0)) * texelSize + vUv;",
-					"vec4 sample = texture2D(tDiffuse, coord);",
-					// http://stackoverflow.com/questions/6538310/anyone-know-where-i-can-find-a-glsl-implementation-of-a-bilateral-filter-blur
-					// PENDING
-					// "float closeness = 1.0 - distance(sample, centerColor) / sqrt(3.0);",
-					"float weight = kernel[x];",
-					"color += weight * sample;",
-					"weightAll += weight;",
-				"}",
+
+			"#ifdef NORMALTEX_ENABLED",
+				"vec3 centerNormal = getViewNormal(vUv);",
+			"#endif",
+			"#ifdef DEPTHTEX_ENABLED",
+				"float centerDepth = getLinearDepth(vUv);",
+			"#endif",
+			
+			"for (int i = 0; i < 5; i++) {",
+				"vec2 coord = clamp(vUv + vec2(float(i) - 2.0) * off, vec2(0.0), vec2(1.0));",
+				"float w = kernel[i];",
+
+				"#ifdef NORMALTEX_ENABLED",
+					"vec3 normal = getViewNormal(coord);",
+					"w *= clamp(dot(normal, centerNormal), 0.0, 1.0);",
+				"#endif",
+				"#ifdef DEPTHTEX_ENABLED",
+					"float d = getLinearDepth(coord);",
+					// PENDING Better equation?
+					"w *= (1.0 - smoothstep(abs(centerDepth - d) / depthRange, 0.0, 1.0));",
+				"#endif",
+
+				"weightAll += w;",
+				"sum += w * texture2D(tDiffuse, coord).r;",
 			"}",
 		
-			"gl_FragColor = color / weightAll;",
+			"gl_FragColor = vec4(vec3(sum / weightAll), 1.0);",
 
 		"}"
 
