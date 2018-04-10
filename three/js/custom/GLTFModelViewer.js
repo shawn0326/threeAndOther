@@ -66,7 +66,7 @@ function ModelViewer(container, options) {
 
     // post-processing
     this.postprocessing = options.postprocessing || {
-        antialiasing: "none",
+        antialiasing: "taa",
         sao: "superssao", // none, sao, ssao, superssao
         bloom: false,
         bokeh: false
@@ -117,13 +117,9 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         var composer = this.composer = new THREE.EffectComposer(renderer);
 
         this.taaRenderPass = new THREE.TAARenderPass(scene, camera);
-        this.taaRenderPass.unbiased = true;
-        this.taaRenderPass.sampleLevel = 0;
         composer.addPass(this.taaRenderPass);
 
         this.ssaaRenderPass = new THREE.SSAARenderPass(scene, camera);
-        this.ssaaRenderPass.unbiased = true;
-        this.ssaaRenderPass.sampleLevel = 4;
         composer.addPass(this.ssaaRenderPass);
 
         this.renderPass = new THREE.RenderPass(scene, camera);
@@ -206,6 +202,9 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
                 this.ssaaRenderPass.enabled = true;
                 this.renderPass.enabled = false;
                 break;
+            case "taa":
+                this.taaRenderPass.enabled = true;
+                this.renderPass.enabled = false;
             default:
 
         }
@@ -274,48 +273,23 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
 
         var postprocessing = this.postprocessing;
 
-        var isStatic;
-        var taaRender = false;
         var zoom = this.controls.getZoomScale();
-        if (this.controls.isStatic() && this.lastZoom == zoom) {
+
+        this.setPostProcessing(postprocessing);
+
+        if (this.controls.isStatic() && this.lastZoom == zoom && this.screenCache) {
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = true;
-                taaRender = true;
             }
-
-            this.setPostProcessing(postprocessing);
-
-            this.renderer.setPixelRatio(window.devicePixelRatio);
-
-            isStatic = false;
         } else {
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = false;
-                this.setPostProcessing(postprocessing);
-            } else {
-                // disable antialiasing
-                var antialiasing = postprocessing.antialiasing;
-                postprocessing.antialiasing = "none";
-                this.setPostProcessing(postprocessing);
-                postprocessing.antialiasing = antialiasing;
             }
 
-            this.renderer.setPixelRatio(1);
-
             this.lastZoom = zoom;
-            isStatic = true;
-            this.screenCache = false;
         }
 
-        var needRender = isStatic || !this.screenCache;
-
-        if (!isStatic) {
-            this.screenCache = true;
-        }
-
-        // if (needRender || taaRender) {
-        //     this.composer.render();
-        // }
+        this.screenCache = true;
 
         this.composer.render();
     }

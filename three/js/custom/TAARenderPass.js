@@ -71,16 +71,30 @@ THREE.TAARenderPass.prototype = Object.assign( Object.create( THREE.SSAARenderPa
 		var autoClear = renderer.autoClear;
 		renderer.autoClear = false;
 
-		var sampleWeight = 1.0 / ( jitterOffsets.length );
+		var baseSampleWeight = 1.0 / jitterOffsets.length;
+		var roundingRange = 1 / 32;
 
 		if ( this.accumulateIndex >= 0 && this.accumulateIndex < jitterOffsets.length ) {
 
-			this.copyUniforms[ "opacity" ].value = sampleWeight;
 			this.copyUniforms[ "tDiffuse" ].value = writeBuffer.texture;
 
 			// render the scene multiple times, each slightly jitter offset from the last and accumulate the results.
 			var numSamplesPerFrame = Math.pow( 2, this.sampleLevel );
 			for ( var i = 0; i < numSamplesPerFrame; i ++ ) {
+				var sampleWeight = baseSampleWeight;
+
+				if ( this.unbiased ) {
+
+					// the theory is that equal weights for each sample lead to an accumulation of rounding errors.
+					// The following equation varies the sampleWeight per sample so that it is uniformly distributed
+					// across a range of values whose rounding errors cancel each other out.
+
+					var uniformCenteredDistribution = ( - 0.5 + ( this.accumulateIndex + 0.5 ) / jitterOffsets.length );
+					sampleWeight += roundingRange * uniformCenteredDistribution;
+
+				}
+
+				this.copyUniforms[ "opacity" ].value = sampleWeight;
 
 				var j = this.accumulateIndex;
 				var jitterOffset = jitterOffsets[ j ];
@@ -106,7 +120,14 @@ THREE.TAARenderPass.prototype = Object.assign( Object.create( THREE.SSAARenderPa
 
 		}
 
-		var accumulationWeight = this.accumulateIndex * sampleWeight;
+		var accumulationWeight = this.accumulateIndex * baseSampleWeight;
+
+		if ( this.unbiased ) {
+			for(var i = 0; i < this.accumulateIndex; i++) {
+				var uniformCenteredDistribution = ( - 0.5 + ( i + 0.5 ) / jitterOffsets.length );
+				accumulationWeight += roundingRange * uniformCenteredDistribution;
+			}
+		}
 
 		if ( accumulationWeight > 0 ) {
 

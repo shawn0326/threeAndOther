@@ -53,7 +53,6 @@
 	<script src="js/postprocessing/EffectComposer.js"></script>
 	<script src="js/postprocessing/SMAAPass.js"></script>
 	<script src="js/postprocessing/SSAARenderPass.js"></script>
-	<script src="js/postprocessing/TAARenderPass.js"></script>
 	<script src="js/postprocessing/RenderPass.js"></script>
 	<script src="js/postprocessing/MaskPass.js"></script>
 	<script src="js/postprocessing/ShaderPass.js"></script>
@@ -70,6 +69,7 @@
 
 	<script src="js/custom/SuperSSAOShader.js"></script>
 	<script src="js/custom/SuperSSAOPass.js"></script>
+	<script src="js/custom/TAARenderPass.js"></script>
 
 	<!-- <script src="js/shaders/BokehShader.js"></script>
 		<script src="js/postprocessing/BokehPass.js"></script> -->
@@ -95,22 +95,55 @@
 			lightHelper: false
 		});
 
+		// https://speech.uinnova.com/static/models/building/Unity2GLTF.gltf
 		viewer.loadModel("../res/uinv/scene.gltf").addEventListener("modelLoaded", function() {
 			console.log("loaded");
 		});
 
 		// gui
 		var gui = new dat.GUI();
-		gui.add(viewer.postprocessing, 'antialiasing', ["fxaa", "smaa", "ssaa", "none"]).onFinishChange(function() {
+		gui.add(viewer.postprocessing, 'antialiasing', ["taa", "fxaa", "smaa", "ssaa", "none"]).onFinishChange(function() {
+			viewer.screenCache = false;
+		});
+
+		var gui4 = gui.addFolder("AASampleLevel");
+
+		var ssaaParams = {
+			SSAASampleLevel: 4
+		};
+		gui4.add(ssaaParams, 'SSAASampleLevel', {
+			'1 Sample': 0,
+			'2 Samples': 1,
+			'4 Samples': 2,
+			'8 Samples': 3,
+			'16 Samples': 4,
+			'32 Samples': 5
+		}).onFinishChange(function() {
+			viewer.ssaaRenderPass.sampleLevel = ssaaParams.SSAASampleLevel;
+			viewer.screenCache = false;
+		});
+
+		var taaParams = {
+			TAASampleLevel: 0
+		};
+		gui4.add(taaParams, 'TAASampleLevel', {
+			'1 Sample': 0,
+			'2 Samples': 1,
+			'4 Samples': 2,
+			'8 Samples': 3,
+			'16 Samples': 4,
+			'32 Samples': 5
+		}).onFinishChange(function() {
+			viewer.taaRenderPass.sampleLevel = taaParams.TAASampleLevel;
 			viewer.screenCache = false;
 		});
 
 		var params = {
-			enable: true,
+			shadowEnable: true,
 			bias: -0.0005,
 			radius: 2
 		};
-		gui.add(params, 'enable').onFinishChange(function(value) {
+		gui.add(params, 'shadowEnable').onFinishChange(function(value) {
 			viewer.mainlight.castShadow = value;
 			viewer.screenCache = false;
 		});
@@ -211,21 +244,7 @@
 			viewer.screenCache = false;
 		});
 
-		var gui4 = gui.addFolder("ssaa");
-		var ssaaParams = {
-			SSAASampleLevel: 2
-		};
-		gui4.add(ssaaParams, 'SSAASampleLevel', {
-			'Level 0: 1 Sample': 0,
-			'Level 1: 2 Samples': 1,
-			'Level 2: 4 Samples': 2,
-			'Level 3: 8 Samples': 3,
-			'Level 4: 16 Samples': 4,
-			'Level 5: 32 Samples': 5
-		}).onFinishChange(function() {
-			viewer.ssaaRenderPass.sampleLevel = ssaaParams.SSAASampleLevel;
-			viewer.screenCache = false;
-		});
+		
 	</script>
 
 </body>
