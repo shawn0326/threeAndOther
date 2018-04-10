@@ -107,15 +107,15 @@
 
 		var params = {
 			enable: true,
-			bias: -0.003,
-			radius: 0.2
+			bias: -0.0005,
+			radius: 2
 		};
 		gui.add(params, 'enable').onFinishChange(function(value) {
 			viewer.mainlight.castShadow = value;
 			viewer.screenCache = false;
 		});
 		var gui2 = gui.addFolder("shadow");
-		gui2.add(params, 'bias').min(-0.01).max(0).onChange(function(value) {
+		gui2.add(params, 'bias').min(-0.005).max(0).onChange(function(value) {
 			viewer.mainlight.shadow.bias = value;
 			viewer.renderer.needsUpdate = true;
 			viewer.screenCache = false;

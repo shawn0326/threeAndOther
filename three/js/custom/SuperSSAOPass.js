@@ -151,6 +151,7 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 	// this.materialCopy.blendSrcAlpha = THREE.DstAlphaFactor;
 	// this.materialCopy.blendDstAlpha = THREE.ZeroFactor;
     // this.materialCopy.blendEquationAlpha = THREE.AddEquation;
+    // 这里使用混色将ssao贴图绘制到结果中
     this.materialCopy.blending = THREE.CustomBlending;
 	this.materialCopy.blendSrc = THREE.ZeroFactor;
 	this.materialCopy.blendDst = THREE.SrcColorFactor;

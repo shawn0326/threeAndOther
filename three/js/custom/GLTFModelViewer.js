@@ -18,7 +18,7 @@ function ModelViewer(container, options) {
     this.scene.background = options.envMap || null;
 
     // 模拟大气散射的半球光
-    var scatteredLight = new THREE.HemisphereLight(0xcccccc, 0xcccccc);
+    var scatteredLight = new THREE.HemisphereLight(0x888888, 0x555555);
     scatteredLight.position.set(0, 1, 0);
     scene.add(scatteredLight);
 
@@ -26,17 +26,18 @@ function ModelViewer(container, options) {
     var mainLight = this.mainlight = new THREE.DirectionalLight(0xffffff);
     mainLight.position.set(10, 10, 10);
     mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 1024;
-    mainLight.shadow.mapSize.height = 1024;
-    mainLight.shadow.camera.near = 1; // default
-    mainLight.shadow.camera.far = 100;
-    var shadowSize = 20;
+    mainLight.shadow.mapSize.x = 2048;
+    mainLight.shadow.mapSize.y = 2048;
+    mainLight.shadow.camera.near = 2; // default
+    mainLight.shadow.camera.far = 30;
+    var shadowSize = 10;
     mainLight.shadow.camera.left = -shadowSize;
     mainLight.shadow.camera.right = shadowSize;
     mainLight.shadow.camera.top = shadowSize;
     mainLight.shadow.camera.bottom = -shadowSize;
-    mainLight.shadow.bias = -0.003;
-    mainLight.intensity = 1;
+    mainLight.shadow.bias = -0.0005;
+    mainLight.shadow.radius = 2;
+    mainLight.intensity = 1.8;
     scene.add(mainLight);
     // 灯光照向模型
     scene.add(mainLight.target);
