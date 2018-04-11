@@ -213,6 +213,9 @@ THREE.SuperSSAOPass = function (scene, camera, resolution, normalDepth) {
     this.setParameter('power', 1);
 
     this.onlyAO = false;
+
+    this.accumulateIndex = -1; // accumulateIndex 用来实现采样的jitter
+    this.accumulate = false;
 }
 
 THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
@@ -247,6 +250,8 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
         }
         
         // draw ssao
+        var kernelIndex = this.accumulateIndex > 0 ? (this.accumulateIndex % this._kernels.length) : 0;
+        this.ssaoMaterial.uniforms["kernel"].value = this._kernels[kernelIndex];
         this.ssaoMaterial.uniforms["gBufferTexSize"].value.copy(this.resolution);
         this.ssaoMaterial.uniforms['projection'].value.copy( this.camera.projectionMatrix );
         this.ssaoMaterial.uniforms['projectionInv'].value.getInverse( this.camera.projectionMatrix );
@@ -265,11 +270,102 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
         this.blurMaterial.uniforms[ 'direction' ].value = 1;
         this.renderPass( renderer, this.blurMaterial, this.ssaoRenderTarget, 0xffffff, 1.0 );
         
-        // copy
-        this.materialCopy.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
-        this.materialCopy.needsUpdate = true;
-        this.materialCopy.blending = THREE.CustomBlending;
-        this.renderPass( renderer, this.materialCopy, this.renderToScreen ? null : readBuffer );
+        if(this.accumulate) {
+            if ( ! this.sampleRenderTarget ) {
+
+                this.sampleRenderTarget = new THREE.WebGLRenderTarget( readBuffer.width, readBuffer.height, this.params );
+                this.sampleRenderTarget.texture.name = "SuperSSAORenderPass.sample";
+    
+            }
+    
+            if ( ! this.holdRenderTarget ) {
+    
+                this.holdRenderTarget = new THREE.WebGLRenderTarget( readBuffer.width, readBuffer.height, this.params );
+                this.holdRenderTarget.texture.name = "SuperSSAORenderPass.hold";
+    
+            }
+
+            if(this.accumulateIndex === -1) {
+
+                // copy to holdRenderTarget
+                this.materialCopy.uniforms[ "opacity" ].value = 1;
+                this.materialCopy.uniforms[ "tDiffuse" ].value = this.ssaoRenderTarget.texture;
+                this.materialCopy.blending = THREE.NoBlending;
+                this.materialCopy.premultipliedAlpha = false;
+                this.renderPass( renderer, this.materialCopy, this.holdRenderTarget, 0xffffff, 1.0 );
+
+                this.accumulateIndex = 0;
+            }
+
+            var baseSampleWeight = 1.0 / this._kernels.length;
+            var roundingRange = 1 / 32;
+
+            var sampleWeight = baseSampleWeight;
+
+            if ( this.unbiased ) {
+
+                // the theory is that equal weights for each sample lead to an accumulation of rounding errors.
+                // The following equation varies the sampleWeight per sample so that it is uniformly distributed
+                // across a range of values whose rounding errors cancel each other out.
+
+                var uniformCenteredDistribution = ( - 0.5 + ( this.accumulateIndex + 0.5 ) / this._kernels.length );
+                sampleWeight += roundingRange * uniformCenteredDistribution;
+
+            }
+
+            /// add ssao to sampleRenderTarget
+            this.materialCopy.uniforms[ "opacity" ].value = sampleWeight;
+            this.materialCopy.uniforms[ "tDiffuse" ].value = this.ssaoRenderTarget.texture;
+            this.materialCopy.blending = THREE.AdditiveBlending;
+            this.materialCopy.premultipliedAlpha = true;
+            this.renderPass( renderer, this.materialCopy, this.sampleRenderTarget, ( this.accumulateIndex === 0 ) ? 0x000000 : undefined, ( this.accumulateIndex === 0 ) ? 0.0 : undefined);
+
+            this.accumulateIndex ++;
+
+            var accumulationWeight = this.accumulateIndex * baseSampleWeight;
+
+            if ( this.unbiased ) {
+                for(var i = 0; i < this.accumulateIndex; i++) {
+                    var uniformCenteredDistribution = ( - 0.5 + ( i + 0.5 ) / this._kernels.length );
+                    accumulationWeight += roundingRange * uniformCenteredDistribution;
+                }
+            }
+
+            if ( accumulationWeight > 0 ) {
+
+                this.materialCopy.uniforms[ "opacity" ].value = 1.0;
+                this.materialCopy.uniforms[ "tDiffuse" ].value = this.sampleRenderTarget.texture;
+                this.materialCopy.blending = THREE.AdditiveBlending;
+                this.materialCopy.premultipliedAlpha = true;
+                this.renderPass( renderer, this.materialCopy, writeBuffer, 0x000000, 0.0 );
+    
+            }
+    
+            if ( accumulationWeight < 1.0 ) {
+    
+                this.materialCopy.uniforms[ "opacity" ].value = 1.0 - accumulationWeight;
+                this.materialCopy.uniforms[ "tDiffuse" ].value = this.holdRenderTarget.texture;
+                this.materialCopy.blending = THREE.AdditiveBlending;
+                this.materialCopy.premultipliedAlpha = true;
+                this.renderPass( renderer, this.materialCopy, writeBuffer, ( accumulationWeight === 0 ) ? 0x000000 : undefined, ( accumulationWeight === 0 ) ? 0.0 : undefined );
+    
+            }
+
+            this.materialCopy.uniforms[ "opacity" ].value = 1.0;
+            this.materialCopy.uniforms[ 'tDiffuse' ].value = writeBuffer.texture;
+            this.materialCopy.blending = THREE.CustomBlending;
+            this.materialCopy.premultipliedAlpha = false;
+            this.renderPass( renderer, this.materialCopy, this.renderToScreen ? null : readBuffer );
+        } else {
+            // copy
+            this.materialCopy.uniforms[ "opacity" ].value = 1.0;
+            this.materialCopy.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
+            this.materialCopy.blending = THREE.CustomBlending;
+            this.materialCopy.premultipliedAlpha = false;
+            this.renderPass( renderer, this.materialCopy, this.renderToScreen ? null : readBuffer );
+
+            this.accumulateIndex = - 1;
+        }
 
         // restore renderer clear states
         renderer.setClearColor( this.oldClearColor, this.oldClearAlpha );
@@ -334,7 +430,10 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
 
     setKernelSize: function(size) {
         this.ssaoMaterial.defines["KERNEL_SIZE"] = size;
-        this.ssaoMaterial.uniforms["kernel"].value = generateKernel(size, undefined, true);
+        this._kernels = this._kernels || [];
+        for (var i = 0; i < 30; i++) {
+            this._kernels[i] = generateKernel(size, i * size, true);
+        }
     },
 
     setNoiseSize: function(size) {

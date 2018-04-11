@@ -284,10 +284,12 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         if (this.controls.isStatic() && this.lastZoom == zoom && this.screenCache) {
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = true;
+                // this.superSSAOPass.accumulate = true;
             }
         } else {
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = false;
+                // this.superSSAOPass.accumulate = false;
             }
 
             this.lastZoom = zoom;
