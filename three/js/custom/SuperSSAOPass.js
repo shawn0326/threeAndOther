@@ -229,13 +229,17 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
 			this.renderPass( renderer, this.materialCopy, null );
         }
 
-        this.onlyAO && renderer.clear(true, true, true);
-
         // save renderer clear states
         this.oldClearColor.copy( renderer.getClearColor() );
 		this.oldClearAlpha = renderer.getClearAlpha();
 		var oldAutoClear = renderer.autoClear;
         renderer.autoClear = false;
+
+        if(this.onlyAO) {
+            renderer.setClearColor(0xffffff);
+            renderer.setClearAlpha(1.0);
+            this.onlyAO && renderer.clear(true, true, true);
+        }
 
         if(this.normalDepth) {
             this.renderOverride( renderer, this.normalDepthMaterial, this.normalDepthRenderTarget, 0x000000, 1.0 );
@@ -360,7 +364,7 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
             this.setKernelSize(val);
         }
         else if (name === 'blurSize') {
-            this.ssaoMaterial.uniforms['blurSize'].value = val;
+            this.blurMaterial.uniforms['blurSize'].value = val;
         }
         else {
             this.ssaoMaterial.uniforms[name].value = val;

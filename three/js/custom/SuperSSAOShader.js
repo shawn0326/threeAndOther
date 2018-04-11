@@ -163,7 +163,7 @@ THREE.SuperSSAOShader = {
 THREE.SuperSSAOBlurShader = {
 
 	defines: {
-		'NORMAL_DEPTH_TEX': 0,
+		'NORMAL_DEPTH_TEX': 1,
 		'NORMALTEX_ENABLED': 1,
 		'DEPTHTEX_ENABLED': 1,
 		'DEPTH_PACKING': 1
@@ -209,7 +209,7 @@ THREE.SuperSSAOBlurShader = {
 		// 0 horizontal, 1 vertical
 		"uniform int direction;",
 
-		"#ifdef NORMALTEX_ENABLED",
+		"#if NORMALTEX_ENABLED == 1",
 			"#if NORMAL_DEPTH_TEX == 1",
 				"uniform sampler2D normalDepthTex;",
 			"#else",
@@ -224,9 +224,9 @@ THREE.SuperSSAOBlurShader = {
 			"}",
 		"#endif",
 
-		"#ifdef DEPTHTEX_ENABLED",
-			"#if NORMAL_DEPTH_TEX == 1",
-				// "uniform sampler2D normalDepthTex;",
+		"#if DEPTHTEX_ENABLED == 1",
+			"#if NORMAL_DEPTH_TEX == 1 && NORMALTEX_ENABLED == 0",
+				"uniform sampler2D normalDepthTex;",
 			"#else",
 				"uniform sampler2D depthTex;",
 			"#endif",
@@ -272,10 +272,10 @@ THREE.SuperSSAOBlurShader = {
 			"float sum = 0.0;",
 			"float weightAll = 0.0;",
 
-			"#ifdef NORMALTEX_ENABLED",
+			"#if NORMALTEX_ENABLED == 1",
 				"vec3 centerNormal = getViewNormal(vUv);",
 			"#endif",
-			"#ifdef DEPTHTEX_ENABLED",
+			"#if DEPTHTEX_ENABLED == 1",
 				"float centerDepth = getLinearDepth(vUv);",
 			"#endif",
 			
@@ -283,11 +283,11 @@ THREE.SuperSSAOBlurShader = {
 				"vec2 coord = clamp(vUv + vec2(float(i) - 2.0) * off, vec2(0.0), vec2(1.0));",
 				"float w = kernel[i];",
 
-				"#ifdef NORMALTEX_ENABLED",
+				"#if NORMALTEX_ENABLED == 1",
 					"vec3 normal = getViewNormal(coord);",
 					"w *= clamp(dot(normal, centerNormal), 0.0, 1.0);",
 				"#endif",
-				"#ifdef DEPTHTEX_ENABLED",
+				"#if DEPTHTEX_ENABLED == 1",
 					"float d = getLinearDepth(coord);",
 					// PENDING Better equation?
 					"w *= (1.0 - smoothstep(abs(centerDepth - d) / depthRange, 0.0, 1.0));",

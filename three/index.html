@@ -230,8 +230,12 @@
 			viewer.screenCache = false;
 		});
 
-		var superssaoParams = {radius:0.5, bias: 0.01, intensity: 0.5};
+		var superssaoParams = {onlyAO: false, radius:0.5, bias: 0.01, intensity: 0.5, blurSize: 1};
 		var gui6 = gui.addFolder("superssao");
+		gui6.add(superssaoParams, 'onlyAO').onFinishChange(function(value) {
+			viewer.superSSAOPass.onlyAO = value;
+			viewer.screenCache = false;
+		});
 		gui6.add(superssaoParams, 'radius').min(0).max(50).onChange(function(value) {
 			viewer.superSSAOPass.setParameter('radius', value);
 			viewer.screenCache = false;
@@ -242,6 +246,10 @@
 		});
 		gui6.add(superssaoParams, 'intensity').min(0).max(1).onChange(function(value) {
 			viewer.superSSAOPass.setParameter('intensity', value);
+			viewer.screenCache = false;
+		});
+		gui6.add(superssaoParams, 'blurSize').min(0).max(10).onChange(function(value) {
+			viewer.superSSAOPass.setParameter('blurSize', value);
 			viewer.screenCache = false;
 		});
 
