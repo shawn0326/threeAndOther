@@ -70,7 +70,9 @@ function generateKernel(size, offset, hemisphere) {
 
 // 优化的 ssao pass，实现细节参考 clay-view
 // resolution 为屏幕分辨率
-THREE.SuperSSAOPass = function (scene, camera, resolution) {
+// normalDepth 默认为 true，将normal与depth渲染到一张纹理中（需要平台支持FloatTexture）
+// 可以使用renderer.capabilities.floatFragmentTextures来判断
+THREE.SuperSSAOPass = function (scene, camera, resolution, normalDepth) {
     THREE.Pass.call( this );
 
     this.scene = scene;
@@ -81,6 +83,8 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 
     this.resolution = ( resolution !== undefined ) ? new THREE.Vector2( resolution.x, resolution.y ) : new THREE.Vector2( 256, 256 );
 
+    this.normalDepth = ( normalDepth !== undefined) ? normalDepth : true;
+
     this.ssaoRenderTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, {
 		minFilter: THREE.LinearFilter,
 		magFilter: THREE.LinearFilter,
@@ -88,20 +92,41 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 	} );
 	this.blurIntermediateRenderTarget = this.ssaoRenderTarget.clone();
 
-    // TODO normal depth 是否可以压缩到一张纹理当中，以减少绘制的开销？
-	this.normalRenderTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, {
-		minFilter: THREE.NearestFilter,
-		magFilter: THREE.NearestFilter,
-		format: THREE.RGBAFormat
-	} );
-    this.depthRenderTarget = this.normalRenderTarget.clone();
-    
-    this.depthMaterial = new THREE.MeshDepthMaterial();
-	this.depthMaterial.depthPacking = THREE.RGBADepthPacking;
-	this.depthMaterial.blending = THREE.NoBlending;
+    if(this.normalDepth) {
+        if ( THREE.NormalDepthShader === undefined ) {
 
-	this.normalMaterial = new THREE.MeshNormalMaterial();
-	this.normalMaterial.blending = THREE.NoBlending;
+            console.error( 'THREE.SuperSSAOPass relies on THREE.NormalDepthShader' );
+    
+        }
+
+        this.normalDepthRenderTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, {
+            minFilter: THREE.NearestFilter,
+            magFilter: THREE.NearestFilter,
+            format: THREE.RGBAFormat,
+            type: THREE.FloatType // depth 
+        } );
+
+        this.normalDepthMaterial = new THREE.ShaderMaterial( {
+            defines: Object.assign( {}, THREE.NormalDepthShader.defines ),
+            fragmentShader: THREE.NormalDepthShader.fragmentShader,
+            vertexShader: THREE.NormalDepthShader.vertexShader,
+            uniforms: THREE.UniformsUtils.clone( THREE.NormalDepthShader.uniforms )
+        } );
+    } else {
+        this.normalRenderTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, {
+            minFilter: THREE.NearestFilter,
+            magFilter: THREE.NearestFilter,
+            format: THREE.RGBAFormat
+        } );
+        this.depthRenderTarget = this.normalRenderTarget.clone();
+
+        this.depthMaterial = new THREE.MeshDepthMaterial();
+        this.depthMaterial.depthPacking = THREE.RGBADepthPacking;
+        this.depthMaterial.blending = THREE.NoBlending;
+
+        this.normalMaterial = new THREE.MeshNormalMaterial();
+        this.normalMaterial.blending = THREE.NoBlending;
+    }
 
 	if ( THREE.SuperSSAOShader === undefined ) {
 
@@ -116,8 +141,14 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 		uniforms: THREE.UniformsUtils.clone( THREE.SuperSSAOShader.uniforms )
     } );
     this.ssaoMaterial.blending = THREE.NoBlending;
-    this.ssaoMaterial.uniforms["tDepth"].value = this.depthRenderTarget.texture;
-    this.ssaoMaterial.uniforms["tNormal"].value = this.normalRenderTarget.texture;
+
+    this.ssaoMaterial.defines["NORMAL_DEPTH_TEX"] = this.normalDepth ? 1 : 0;
+    if(this.normalDepth) {
+        this.ssaoMaterial.uniforms["normalDepthTex"].value = this.normalDepthRenderTarget.texture;
+    } else {
+        this.ssaoMaterial.uniforms["tDepth"].value = this.depthRenderTarget.texture;
+        this.ssaoMaterial.uniforms["tNormal"].value = this.normalRenderTarget.texture;
+    }
 
     this.blurMaterial = new THREE.ShaderMaterial( {
 		defines: Object.assign( {}, THREE.SuperSSAOBlurShader.defines ),
@@ -126,8 +157,14 @@ THREE.SuperSSAOPass = function (scene, camera, resolution) {
 		uniforms: THREE.UniformsUtils.clone( THREE.SuperSSAOBlurShader.uniforms )
     } );
     this.blurMaterial.blending = THREE.NoBlending;
-    this.blurMaterial.uniforms[ 'normalTex' ].value = this.normalRenderTarget.texture;
-    this.blurMaterial.uniforms[ 'depthTex' ].value = this.depthRenderTarget.texture;
+
+    this.blurMaterial.defines["NORMAL_DEPTH_TEX"] = this.normalDepth ? 1 : 0;
+    if(this.normalDepth) {
+        this.blurMaterial.uniforms["normalDepthTex"].value = this.normalDepthRenderTarget.texture;
+    } else {
+        this.blurMaterial.uniforms[ 'normalTex' ].value = this.normalRenderTarget.texture;
+        this.blurMaterial.uniforms[ 'depthTex' ].value = this.depthRenderTarget.texture;
+    }
 
     if ( THREE.CopyShader === undefined ) {
 
@@ -200,10 +237,14 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
 		var oldAutoClear = renderer.autoClear;
         renderer.autoClear = false;
 
-        // Clear rule : far clipping plane in both RGBA and Basic encoding
-        this.renderOverride( renderer, this.depthMaterial, this.depthRenderTarget, 0x000000, 1.0 );
-        // Clear rule : default normal is facing the camera
-        this.renderOverride( renderer, this.normalMaterial, this.normalRenderTarget, 0x7777ff, 1.0 );
+        if(this.normalDepth) {
+            this.renderOverride( renderer, this.normalDepthMaterial, this.normalDepthRenderTarget, 0x000000, 1.0 );
+        } else {
+            // Clear rule : far clipping plane in both RGBA and Basic encoding
+            this.renderOverride( renderer, this.depthMaterial, this.depthRenderTarget, 0x000000, 1.0 );
+            // Clear rule : default normal is facing the camera
+            this.renderOverride( renderer, this.normalMaterial, this.normalRenderTarget, 0x7777ff, 1.0 );
+        }
         
         // draw ssao
         this.ssaoMaterial.uniforms["gBufferTexSize"].value.copy(this.resolution);
@@ -324,6 +365,26 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
         else {
             this.ssaoMaterial.uniforms[name].value = val;
         }
-    }
+    },
+
+    dispose: function () {
+
+		this.ssaoRenderTarget && this.ssaoRenderTarget.dispose();
+        this.blurIntermediateRenderTarget && this.blurIntermediateRenderTarget.dispose();
+        this.normalDepthRenderTarget && this.normalDepthRenderTarget.dispose();
+        this.normalRenderTarget && this.normalRenderTarget.dispose();
+        this.depthRenderTarget && this.depthRenderTarget.dispose();
+
+	},
+
+	setSize: function ( width, height ) {
+
+        this.ssaoRenderTarget && this.ssaoRenderTarget.setSize(width, height);
+        this.blurIntermediateRenderTarget && this.blurIntermediateRenderTarget.setSize(width, height);
+        this.normalDepthRenderTarget && this.normalDepthRenderTarget.setSize(width, height);
+        this.normalRenderTarget && this.normalRenderTarget.setSize(width, height);
+        this.depthRenderTarget && this.depthRenderTarget.setSize(width, height);
+
+	}
 });
 

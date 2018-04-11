@@ -5,6 +5,7 @@
 THREE.SuperSSAOShader = {
 
 	defines: {
+		'NORMAL_DEPTH_TEX': 0,
 		'PERSPECTIVE_CAMERA': 1,
 		'DEPTH_PACKING': 1,
 		'KERNEL_SIZE': 64,
@@ -14,6 +15,7 @@ THREE.SuperSSAOShader = {
 	uniforms: {
         'tDepth': { value: null },
 		'tNormal': { value: null },
+		'normalDepthTex': { value: null },
 		'noiseTex': { value: null },
 		'gBufferTexSize': { value: new THREE.Vector2() },
 		'noiseTexSize': { value: new THREE.Vector2(4, 4) },
@@ -45,9 +47,12 @@ THREE.SuperSSAOShader = {
 
 		"varying vec2 vUv;",
 
-		"uniform sampler2D tDepth;",
-
-		"uniform sampler2D tNormal;",
+		// "#if NORMAL_DEPTH_TEX == 1",
+			"uniform sampler2D normalDepthTex;",
+		// "#else",
+			"uniform sampler2D tDepth;",
+			"uniform sampler2D tNormal;",
+		// "#endif",
 
 		"uniform sampler2D noiseTex;",
 
@@ -74,15 +79,23 @@ THREE.SuperSSAOShader = {
 		"#include <packing>",
 
 		"float getDepth( const in vec2 screenPosition ) {",
-		"	#if DEPTH_PACKING == 1",
-		"	return unpackRGBAToDepth( texture2D( tDepth, screenPosition ) );",
-		"	#else",
-		"	return texture2D( tDepth, screenPosition ).x;",
-		"	#endif",
+			"#if NORMAL_DEPTH_TEX == 1",
+				"return texture2D( normalDepthTex, screenPosition ).w;",
+			"#else",
+				"#if DEPTH_PACKING == 1",
+					"return unpackRGBAToDepth( texture2D( tDepth, screenPosition ) );",
+				"#else",
+					"return texture2D( tDepth, screenPosition ).x;",
+				"#endif",
+			"#endif",
 		"}",
 
 		"vec3 getViewNormal( const in vec2 screenPosition ) {",
-		"	return unpackRGBToNormal( texture2D( tNormal, screenPosition ).xyz );",
+			"#if NORMAL_DEPTH_TEX == 1",
+				"return texture2D( normalDepthTex, screenPosition ).xyz * 2.0 - 1.0;",
+			"#else",
+				"return unpackRGBToNormal( texture2D( tNormal, screenPosition ).xyz );",
+			"#endif",
 		"}",
 
 		"float ssaoEstimator(in mat3 kernelBasis, in vec3 originPos) {",
@@ -139,6 +152,8 @@ THREE.SuperSSAOShader = {
 			"ao = clamp(1.0 - (1.0 - ao) * intensity, 0.0, 1.0);",
 			"gl_FragColor = vec4(vec3(ao), 1.0);",
 
+			// "gl_FragColor = texture2D( normalDepthTex, vUv );",
+
 		"}"
 
 	].join( "\n" )
@@ -148,6 +163,7 @@ THREE.SuperSSAOShader = {
 THREE.SuperSSAOBlurShader = {
 
 	defines: {
+		'NORMAL_DEPTH_TEX': 0,
 		'NORMALTEX_ENABLED': 1,
 		'DEPTHTEX_ENABLED': 1,
 		'DEPTH_PACKING': 1
@@ -160,6 +176,7 @@ THREE.SuperSSAOBlurShader = {
 		'blurSize': {value: 1},
 		'depthTex': { value: null },
 		'normalTex': { value: null },
+		'normalDepthTex': { value: null },
 		'projection': { value: new THREE.Matrix4() },
 		'depthRange': { value: 0.05}
 	},
@@ -193,23 +210,39 @@ THREE.SuperSSAOBlurShader = {
 		"uniform int direction;",
 
 		"#ifdef NORMALTEX_ENABLED",
-			"uniform sampler2D normalTex;",
+			"#if NORMAL_DEPTH_TEX == 1",
+				"uniform sampler2D normalDepthTex;",
+			"#else",
+				"uniform sampler2D normalTex;",
+			"#endif",
 			"vec3 getViewNormal( const in vec2 screenPosition ) {",
-			"	return unpackRGBToNormal( texture2D( normalTex, screenPosition ).xyz );",
+				"#if NORMAL_DEPTH_TEX == 1",
+					"return texture2D( normalDepthTex, screenPosition ).xyz * 2.0 - 1.0;",
+				"#else",
+					"return unpackRGBToNormal( texture2D( normalTex, screenPosition ).xyz );",
+				"#endif",
 			"}",
 		"#endif",
 
 		"#ifdef DEPTHTEX_ENABLED",
-			"uniform sampler2D depthTex;",
+			"#if NORMAL_DEPTH_TEX == 1",
+				// "uniform sampler2D normalDepthTex;",
+			"#else",
+				"uniform sampler2D depthTex;",
+			"#endif",
 			"uniform mat4 projection;",
 			"uniform float depthRange;",
 
 			"float getDepth( const in vec2 screenPosition ) {",
-			"	#if DEPTH_PACKING == 1",
-			"	return unpackRGBAToDepth( texture2D( depthTex, screenPosition ) );",
-			"	#else",
-			"	return texture2D( depthTex, screenPosition ).x;",
-			"	#endif",
+				"#if NORMAL_DEPTH_TEX == 1",
+					"return texture2D( normalDepthTex, screenPosition ).w;",
+				"#else",
+					"#if DEPTH_PACKING == 1",
+						"return unpackRGBAToDepth( texture2D( depthTex, screenPosition ) );",
+					"#else",
+						"return texture2D( depthTex, screenPosition ).x;",
+					"#endif",
+				"#endif",
 			"}",
 
 			"float getLinearDepth(vec2 coord)",
