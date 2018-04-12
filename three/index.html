@@ -67,8 +67,10 @@
 	<script src="js/custom/OrbitControls.js"></script>
 	<script src="js/custom/GLTFModelViewer.js"></script>
 
+	<script src="js/custom/PrePass.js"></script>
 	<script src="js/custom/SuperSSAOShader.js"></script>
 	<script src="js/custom/SuperSSAOPass.js"></script>
+	<script src="js/custom/TemporalSSAOPass.js"></script>
 	<script src="js/custom/TAARenderPass.js"></script>
 	<script src="js/custom/NormalDepthShader.js"></script>
 
@@ -230,7 +232,7 @@
 			viewer.screenCache = false;
 		});
 
-		var superssaoParams = {onlyAO: false, radius:0.5, bias: 0.01, intensity: 0.5, blurSize: 1};
+		var superssaoParams = {onlyAO: false, radius:0.5, bias: 0.01, intensity: 0.8, blurSize: 1};
 		var gui6 = gui.addFolder("superssao");
 		gui6.add(superssaoParams, 'onlyAO').onFinishChange(function(value) {
 			viewer.superSSAOPass.onlyAO = value;

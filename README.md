@@ -19,6 +19,6 @@ the aim of this project is: create a GLTF Model Renderer based on threejs.
 
 ### 待解决
 
-* 需要对SuperSSAOPass进行单独的抗锯齿处理*
+* 需要对SuperSSAOPass进行单独的抗锯齿处理
 * 添加Bloom效果
 * 添加DOF效果

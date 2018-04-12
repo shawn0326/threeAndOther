@@ -18,7 +18,7 @@ function ModelViewer(container, options) {
     this.scene.background = options.envMap || null;
 
     // 模拟大气散射的半球光
-    var scatteredLight = new THREE.HemisphereLight(0x888888, 0x555555);
+    var scatteredLight = new THREE.HemisphereLight(0xaaaaaa, 0x555555);
     scatteredLight.position.set(0, 1, 0);
     scene.add(scatteredLight);
 
@@ -161,12 +161,12 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         };
         composer.addPass(this.saoPass);
 
-        this.superSSAOPass = new THREE.SuperSSAOPass(
+        this.superSSAOPass = new THREE.TemporalSSAOPass(
             scene, camera, 
             new THREE.Vector2(window.innerWidth, window.innerHeight),
             renderer.capabilities.floatFragmentTextures
         );
-        this.superSSAOPass.setParameter('intensity', 0.5);
+        this.superSSAOPass.setParameter('intensity', 0.8);
         composer.addPass(this.superSSAOPass);
 
         this.smaaPass = new THREE.SMAAPass(window.innerWidth, window.innerHeight);
@@ -285,9 +285,15 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = true;
             }
+            if(this.superSSAOPass.enabled) {
+                this.superSSAOPass.accumulate = true;
+            }
         } else {
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = false;
+            }
+            if(this.superSSAOPass.enabled) {
+                this.superSSAOPass.accumulate = false;
             }
 
             this.lastZoom = zoom;
