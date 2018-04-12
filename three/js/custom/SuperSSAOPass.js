@@ -157,8 +157,8 @@ THREE.SuperSSAOPass = function (scene, camera, resolution, normalDepth) {
     this.setNoiseSize(4);
     this.setKernelSize(12);
 
-    this.setParameter('radius', 0.5);
-    this.setParameter('bias', 0.5 / 50);
+    this.setParameter('radius', 0.2);
+    this.setParameter('bias', 0.2 / 50);
     this.setParameter('power', 1);
 
     this.onlyAO = false;

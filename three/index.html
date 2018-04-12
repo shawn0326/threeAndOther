@@ -99,6 +99,7 @@
 		});
 
 		// https://speech.uinnova.com/static/models/building/Unity2GLTF.gltf
+		// ./res/uinv/scene.gltf
 		viewer.loadModel("../res/uinv/scene.gltf").addEventListener("modelLoaded", function() {
 			console.log("loaded");
 		});
@@ -232,17 +233,17 @@
 			viewer.screenCache = false;
 		});
 
-		var superssaoParams = {onlyAO: false, radius:0.5, bias: 0.01, intensity: 0.8, blurSize: 1};
+		var superssaoParams = {onlyAO: false, radius:0.2, bias: 0.004, intensity: 0.6, blurSize: 1};
 		var gui6 = gui.addFolder("superssao");
 		gui6.add(superssaoParams, 'onlyAO').onFinishChange(function(value) {
 			viewer.superSSAOPass.onlyAO = value;
 			viewer.screenCache = false;
 		});
-		gui6.add(superssaoParams, 'radius').min(0).max(50).onChange(function(value) {
+		gui6.add(superssaoParams, 'radius').min(0).max(1).onChange(function(value) {
 			viewer.superSSAOPass.setParameter('radius', value);
 			viewer.screenCache = false;
 		});
-		gui6.add(superssaoParams, 'bias').min(0).max(1).onChange(function(value) {
+		gui6.add(superssaoParams, 'bias').min(0).max(0.02).onChange(function(value) {
 			viewer.superSSAOPass.setParameter('bias', value);
 			viewer.screenCache = false;
 		});

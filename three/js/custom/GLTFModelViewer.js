@@ -166,7 +166,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
             new THREE.Vector2(window.innerWidth, window.innerHeight),
             renderer.capabilities.floatFragmentTextures
         );
-        this.superSSAOPass.setParameter('intensity', 0.8);
+        this.superSSAOPass.setParameter('intensity', 0.6);
         composer.addPass(this.superSSAOPass);
 
         this.smaaPass = new THREE.SMAAPass(window.innerWidth, window.innerHeight);
