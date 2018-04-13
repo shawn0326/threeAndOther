@@ -18,26 +18,29 @@ function ModelViewer(container, options) {
     this.scene.background = options.envMap || null;
 
     // 模拟大气散射的半球光
-    var scatteredLight = new THREE.HemisphereLight(0xaaaaaa, 0x555555);
-    scatteredLight.position.set(0, 1, 0);
-    scene.add(scatteredLight);
+    // var scatteredLight = new THREE.HemisphereLight(0xffffff, 0xdddddd);
+    // scatteredLight.position.set(0, 1, 0);
+    // scene.add(scatteredLight);
+
+    var ambientLight = new THREE.AmbientLight(0xcccccc);
+    scene.add(ambientLight);
 
     // 主要灯光
     var mainLight = this.mainlight = new THREE.DirectionalLight(0xffffff);
-    mainLight.position.set(10, 10, 10);
+    mainLight.position.set(10, 10, 3);
     mainLight.castShadow = true;
-    mainLight.shadow.mapSize.x = 2048;
-    mainLight.shadow.mapSize.y = 2048;
-    mainLight.shadow.camera.near = 2; // default
-    mainLight.shadow.camera.far = 30;
-    var shadowSize = 10;
+    mainLight.shadow.mapSize.x = 4096;
+    mainLight.shadow.mapSize.y = 4096;
+    mainLight.shadow.camera.near = 1; // default
+    mainLight.shadow.camera.far = 80;
+    var shadowSize = 4;
     mainLight.shadow.camera.left = -shadowSize;
     mainLight.shadow.camera.right = shadowSize;
     mainLight.shadow.camera.top = shadowSize;
     mainLight.shadow.camera.bottom = -shadowSize;
-    mainLight.shadow.bias = -0.0005;
+    mainLight.shadow.bias = 0.000;
     mainLight.shadow.radius = 2;
-    mainLight.intensity = 1.8;
+    mainLight.intensity = 1;
     scene.add(mainLight);
     // 灯光照向模型
     scene.add(mainLight.target);
@@ -53,10 +56,10 @@ function ModelViewer(container, options) {
     // 抗锯齿 使用processing处理的情况下，antialias无效
     // 因为antialias只对backbuffer生效，对framebuffer不生效
     // 所以，在使用了其它processingpass的情况下，需要配合使用抗锯齿pass
-    // renderer = new THREE.WebGLRenderer( { antialias: true } );
+    // var renderer = this.renderer = new THREE.WebGLRenderer( { antialias: true } );
     var renderer = this.renderer = new THREE.WebGLRenderer();
     // 在retina屏幕上大幅提高画面质量
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1.5 : 1);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.gammaOutput = true;
     // 使用预烘培的阴影贴图
@@ -67,7 +70,7 @@ function ModelViewer(container, options) {
     // post-processing
     this.postprocessing = options.postprocessing || {
         antialiasing: "taa",
-        sao: "superssao", // none, sao, ssao, superssao
+        sao: "none", // none, sao, ssao, superssao
         bloom: false,
         bokeh: false
     };
@@ -162,7 +165,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
         composer.addPass(this.saoPass);
 
         this.superSSAOPass = new THREE.TemporalSSAOPass(
-            scene, camera, 
+            scene, camera,
             new THREE.Vector2(window.innerWidth, window.innerHeight),
             renderer.capabilities.floatFragmentTextures
         );
@@ -230,7 +233,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
             this.saoPass.enabled = false;
             this.superSSAOPass.enabled = false;
         }
-        
+
     },
 
     loadModel: function(url) {
@@ -288,6 +291,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
             if(this.superSSAOPass.enabled) {
                 this.superSSAOPass.accumulate = true;
             }
+            // this.superSSAOPass.setSize(window.innerWidth * 1.5, window.innerHeight * 1.5);
         } else {
             if (postprocessing.antialiasing == "taa") {
                 this.taaRenderPass.accumulate = false;
@@ -295,6 +299,7 @@ ModelViewer.prototype = Object.assign(Object.create(THREE.EventDispatcher.protot
             if(this.superSSAOPass.enabled) {
                 this.superSSAOPass.accumulate = false;
             }
+            // this.superSSAOPass.setSize(window.innerWidth / 2, window.innerHeight / 2);
 
             this.lastZoom = zoom;
         }

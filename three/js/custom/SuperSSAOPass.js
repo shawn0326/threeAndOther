@@ -89,7 +89,7 @@ THREE.SuperSSAOPass = function (scene, camera, resolution, normalDepth) {
         if ( THREE.NormalDepthPrePass === undefined ) {
 
             console.error( 'THREE.SuperSSAOPass relies on THREE.NormalDepthPrePass' );
-    
+
         }
 
         this.normalDepthPrePass = new THREE.NormalDepthPrePass(scene, camera, resolution);
@@ -97,13 +97,13 @@ THREE.SuperSSAOPass = function (scene, camera, resolution, normalDepth) {
         if ( THREE.NormalPrePass === undefined ) {
 
             console.error( 'THREE.SuperSSAOPass relies on THREE.NormalPrePass' );
-    
+
         }
 
         if ( THREE.DepthPrePass === undefined ) {
 
             console.error( 'THREE.SuperSSAOPass relies on THREE.DepthPrePass' );
-    
+
         }
 
         this.normalPrePass = new THREE.NormalPrePass(scene, camera, resolution);
@@ -150,12 +150,12 @@ THREE.SuperSSAOPass = function (scene, camera, resolution, normalDepth) {
 	this.quadScene = new THREE.Scene();
 	this.quad = new THREE.Mesh( new THREE.PlaneGeometry( 2, 2 ), null );
     this.quadScene.add( this.quad );
-    
+
     this.oldClearColor = new THREE.Color();
     this.oldClearAlpha = 1;
-    
+
     this.setNoiseSize(4);
-    this.setKernelSize(12);
+    this.setKernelSize(6); // 12
 
     this.setParameter('radius', 0.2);
     this.setParameter('bias', 0.2 / 50);
@@ -196,9 +196,9 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
             this.normalPrePass.update(renderer);
             this.depthPrePass.update(renderer);
         }
-        
+
         this.ssaoPrePass.update(renderer);
-        
+
         // copy ssao to result
         this.materialCopy.uniforms[ 'tDiffuse' ].value = this.ssaoPrePass.getTexture();
         this.materialCopy.blending = THREE.CustomBlending;
@@ -262,7 +262,7 @@ THREE.SuperSSAOPass.prototype = Object.assign( Object.create( THREE.Pass.prototy
 		renderer.autoClear = originalAutoClear;
 		renderer.setClearColor( originalClearColor );
         renderer.setClearAlpha( originalClearAlpha );
-        
+
 	},
 
     setKernelSize: function(size) {

@@ -147,6 +147,12 @@ THREE.TAARenderPass.prototype = Object.assign( Object.create( THREE.SSAARenderPa
 
 		renderer.autoClear = autoClear;
 
+	},
+
+	setSize: function(width, height) {
+		THREE.SSAARenderPass.prototype.setSize.call( this, width, height );
+		this.sampleRenderTarget && this.sampleRenderTarget.setSize(width, height);
+		this.holdRenderTarget && this.holdRenderTarget.setSize(width, height);
 	}
 
 } );

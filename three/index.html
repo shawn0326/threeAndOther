@@ -128,7 +128,8 @@
 		});
 
 		var taaParams = {
-			TAASampleLevel: 0
+			TAASampleLevel: 0,
+			unbiased: true
 		};
 		gui4.add(taaParams, 'TAASampleLevel', {
 			'1 Sample': 0,
@@ -141,10 +142,14 @@
 			viewer.taaRenderPass.sampleLevel = taaParams.TAASampleLevel;
 			viewer.screenCache = false;
 		});
+		gui4.add(taaParams, 'unbiased').onFinishChange(function(value) {
+			viewer.taaRenderPass.unbiased = value;
+			viewer.screenCache = false;
+		});
 
 		var params = {
 			shadowEnable: true,
-			bias: -0.0005,
+			bias: 0.000,
 			radius: 2
 		};
 		gui.add(params, 'shadowEnable').onFinishChange(function(value) {
@@ -256,7 +261,7 @@
 			viewer.screenCache = false;
 		});
 
-		
+
 	</script>
 
 </body>

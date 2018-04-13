@@ -14,7 +14,7 @@ THREE.TemporalSSAOPass = function ( scene, camera, resolution, normalDepth ) {
     if ( THREE.CopyShader === undefined ) console.error( "THREE.TemporalSSAOPass relies on THREE.CopyShader" );
 
 	var copyShader = THREE.CopyShader;
-    
+
     this.temporalCopyMaterial = new THREE.ShaderMaterial(	{
 		uniforms: THREE.UniformsUtils.clone( copyShader.uniforms ),
 		vertexShader: copyShader.vertexShader,
@@ -26,7 +26,7 @@ THREE.TemporalSSAOPass = function ( scene, camera, resolution, normalDepth ) {
 		depthWrite: false
 	} );
 
-    
+
     this.accumulate = false;
     this.unbiased = true;
 
@@ -90,7 +90,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
             renderer.setClearAlpha(1.0);
             this.onlyAO && renderer.clear(true, true, true);
         }
-        
+
         if ( this.accumulate && this.accumulateIndex === - 1 ) {
 
             if(this.normalDepth) {
@@ -99,7 +99,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
                 this.normalPrePass.update(renderer);
                 this.depthPrePass.update(renderer);
             }
-            
+
             this.ssaoPrePass.update(renderer);
 
             // 将ssao绘制到hold
@@ -110,7 +110,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
 			this.accumulateIndex = 0;
 
         }
-        
+
         var baseSampleWeight = 1.0 / jitterOffsets.length;
         var roundingRange = 1 / 32;
 
@@ -133,7 +133,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
 
             var j = this.accumulateIndex;
             var jitterOffset = jitterOffsets[ j ];
-            
+
             if ( this.camera.setViewOffset ) {
 
                 this.camera.setViewOffset( readBuffer.width, readBuffer.height,
@@ -150,7 +150,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
                 this.normalPrePass.update(renderer);
                 this.depthPrePass.update(renderer);
             }
-            
+
             this.ssaoPrePass.update(renderer);
             this.renderPass( renderer, this.temporalCopyMaterial, this.sampleRenderTarget, ( this.accumulateIndex === 0 ) ? 0x000000 : undefined, ( this.accumulateIndex === 0 ) ? 0 : undefined);
 
@@ -158,7 +158,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
 
             if ( this.camera.clearViewOffset ) this.camera.clearViewOffset();
         }
-        
+
         var accumulationWeight = this.accumulateIndex * baseSampleWeight;
 
         if ( this.unbiased ) {
@@ -167,7 +167,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
 				accumulationWeight += roundingRange * uniformCenteredDistribution;
 			}
         }
-        
+
         if ( accumulationWeight > 0 ) {
 
 			this.temporalCopyMaterial.uniforms[ "opacity" ].value = 1.0;
@@ -183,7 +183,7 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
             this.renderPass( renderer, this.temporalCopyMaterial, this.resultRenderTarget, ( accumulationWeight === 0 ) ? 0x000000 : undefined, ( accumulationWeight === 0 ) ? 0 : undefined);
 
         }
-        
+
         // copy ssao to result
         this.materialCopy.uniforms[ 'tDiffuse' ].value = this.resultRenderTarget.texture;
         this.materialCopy.blending = THREE.CustomBlending;
@@ -204,7 +204,13 @@ THREE.TemporalSSAOPass.prototype = Object.assign( Object.create( THREE.SuperSSAO
         }
 
         this.ssaoPrePass.ssaoMaterial.uniforms["kernel"].value = this._kernels[0];
-    }
+    },
+
+	setSize: function(width, height) {
+		THREE.SuperSSAOPass.prototype.setSize.call( this, width, height );
+		this.sampleRenderTarget && this.sampleRenderTarget.setSize(width, height);
+		this.holdRenderTarget && this.holdRenderTarget.setSize(width, height);
+	}
 });
 
 // These jitter vectors are specified in integers because it is easier.

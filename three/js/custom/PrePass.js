@@ -9,19 +9,19 @@ THREE.PrePass = function(scene, camera) {
 Object.assign( THREE.PrePass.prototype, {
 
     update: function(renderer) {
-        
+
     },
 
     setSize: function(width, height) {
-        
+
     },
 
     dispose: function() {
-        
+
     },
 
     getTexture: function() {
-        
+
     },
 
     renderOverride: function ( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
@@ -29,28 +29,28 @@ Object.assign( THREE.PrePass.prototype, {
         var originalClearColor = renderer.getClearColor();
         var originalClearAlpha = renderer.getClearAlpha();
         var originalAutoClear = renderer.autoClear;
-    
+
         renderer.autoClear = false;
-    
+
         clearColor = overrideMaterial.clearColor || clearColor;
         clearAlpha = overrideMaterial.clearAlpha || clearAlpha;
         var clearNeeded = ( clearColor !== undefined ) && ( clearColor !== null );
         if ( clearNeeded ) {
-    
+
             renderer.setClearColor( clearColor );
             renderer.setClearAlpha( clearAlpha || 0.0 );
-    
+
         }
-    
+
         this.scene.overrideMaterial = overrideMaterial;
         renderer.render( this.scene, this.camera, renderTarget, clearNeeded );
         this.scene.overrideMaterial = null;
-    
+
         // restore original state
         renderer.autoClear = originalAutoClear;
         renderer.setClearColor( originalClearColor );
         renderer.setClearAlpha( originalClearAlpha );
-        
+
     }
 })
 
@@ -144,7 +144,7 @@ THREE.NormalDepthPrePass = function(scene, camera, resolution) {
         minFilter: THREE.NearestFilter,
         magFilter: THREE.NearestFilter,
         format: THREE.RGBAFormat,
-        type: THREE.FloatType // depth 
+        type: THREE.FloatType // depth
     } );
 
     this.normalDepthMaterial = new THREE.ShaderMaterial( {
@@ -168,7 +168,7 @@ THREE.NormalDepthPrePass.prototype = Object.assign( Object.create( THREE.PrePass
     },
 
     dispose: function() {
-        this.normalDepthRenderTarget.dispose();   
+        this.normalDepthRenderTarget.dispose();
     },
 
     getTexture: function() {
@@ -193,7 +193,7 @@ THREE.SSAOPrePass = function(scene, camera, resolution, normalDepthTexture, norm
 		console.error( 'THREE.SSAOPrePass relies on THREE.SuperSSAOShader' );
 
     }
-    
+
     this.ssaoMaterial = new THREE.ShaderMaterial( {
 		defines: Object.assign( {}, THREE.SuperSSAOShader.defines ),
 		fragmentShader: THREE.SuperSSAOShader.fragmentShader,
@@ -245,7 +245,7 @@ THREE.SSAOPrePass.prototype = Object.assign( Object.create( THREE.PrePass.protot
         this.ssaoMaterial.uniforms['projectionInv'].value.getInverse( this.camera.projectionMatrix );
         this.ssaoMaterial.uniforms['viewInverseTranspose'].value.copy( this.camera.matrixWorld ).transpose();
         this.renderPass( renderer, this.ssaoMaterial, this.ssaoRenderTarget, 0xffffff, 1.0 );
-        
+
         // blur
         this.blurMaterial.uniforms['projection'].value.copy( this.camera.projectionMatrix );
 

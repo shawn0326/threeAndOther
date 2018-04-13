@@ -9,7 +9,8 @@ THREE.SuperSSAOShader = {
 		'PERSPECTIVE_CAMERA': 1,
 		'DEPTH_PACKING': 1,
 		'KERNEL_SIZE': 64,
-		'EPSILON': 1e-6
+		'EPSILON': 1e-6,
+		// 'ALCHEMY': 1
 	},
 
 	uniforms: {
@@ -98,24 +99,41 @@ THREE.SuperSSAOShader = {
 			"#endif",
 		"}",
 
-		"float ssaoEstimator(in mat3 kernelBasis, in vec3 originPos) {",
+		"float ssaoEstimator(in mat3 kernelBasis, in vec3 originPos, in vec3 N) {",
 			"float occlusion = 0.0;",
-		
+
 			"for (int i = 0; i < KERNEL_SIZE; i++) {",
 				"vec3 samplePos = kernelBasis * kernel[i];",
 				"samplePos = samplePos * radius + originPos;",
-		
+
 				"vec4 texCoord = projection * vec4(samplePos, 1.0);",
 				"texCoord.xy /= texCoord.w;",
-		
+
 				"float sampleDepth = getDepth(texCoord.xy * 0.5 + 0.5);",
 				"float z = sampleDepth * 2.0 - 1.0;",
-		
-				// just for perspective camera
-				"z = projection[3][2] / (z * projection[2][3] - projection[2][2]);",
-		
-				"float rangeCheck = smoothstep(0.0, 1.0, radius / abs(originPos.z - z));",
-				"occlusion += rangeCheck * step(samplePos.z, z - bias);",
+
+				"#ifdef ALCHEMY",
+			        "vec4 projectedPos = vec4(texCoord.xy * 2.0 - 1.0, z, 1.0);",
+			        "vec4 p4 = projectionInv * projectedPos;",
+			        "p4.xyz /= p4.w;",
+			        "vec3 cDir = p4.xyz - originPos;",
+
+			        "float vv = dot(cDir, cDir);",
+			        "float vn = dot(cDir, N);",
+
+			        "float radius2 = radius * radius;",
+
+			        "vn = max(vn + p4.z * bias, 0.0);",
+			        "float f = max(radius2 - vv, 0.0) / radius2;",
+			        "occlusion += f * f * f * max(vn / (0.01 + vv), 0.0);",
+				"#else",
+					// just for perspective camera
+					"z = projection[3][2] / (z * projection[2][3] - projection[2][2]);",
+
+					"float rangeCheck = smoothstep(0.0, 1.0, radius / abs(originPos.z - z));",
+					"occlusion += rangeCheck * step(samplePos.z, z - bias);",
+
+				"#endif",
 			"}",
 			"occlusion = 1.0 - occlusion / float(KERNEL_SIZE);",
 			"return pow(occlusion, power);",
@@ -129,13 +147,13 @@ THREE.SuperSSAOShader = {
 			"}",
 
 			"vec3 N = getViewNormal( vUv );",
-		
+
 			// Convert to view space
 			// "N = (viewInverseTranspose * vec4(N, 0.0)).xyz;",
-		
+
 			"vec2 noiseTexCoord = gBufferTexSize / vec2(noiseTexSize) * vUv;",
 			"vec3 rvec = texture2D(noiseTex, noiseTexCoord).rgb * 2.0 - 1.0;",
-		
+
 			// Tangent
 			"vec3 T = normalize(rvec - N * dot(rvec, N));",
 			// Bitangent
@@ -147,8 +165,8 @@ THREE.SuperSSAOShader = {
 			"vec4 projectedPos = vec4(vUv * 2.0 - 1.0, z, 1.0);",
 			"vec4 p4 = projectionInv * projectedPos;",
 			"vec3 position = p4.xyz / p4.w;",
-		
-			"float ao = ssaoEstimator(kernelBasis, position);",
+
+			"float ao = ssaoEstimator(kernelBasis, position, N);",
 			"ao = clamp(1.0 - (1.0 - ao) * intensity, 0.0, 1.0);",
 			"gl_FragColor = vec4(vec3(ao), 1.0);",
 
@@ -180,7 +198,7 @@ THREE.SuperSSAOBlurShader = {
 		'projection': { value: new THREE.Matrix4() },
 		'depthRange': { value: 0.05}
 	},
-	
+
 	vertexShader: [
 
 		"varying vec2 vUv;",
@@ -278,7 +296,7 @@ THREE.SuperSSAOBlurShader = {
 			"#if DEPTHTEX_ENABLED == 1",
 				"float centerDepth = getLinearDepth(vUv);",
 			"#endif",
-			
+
 			"for (int i = 0; i < 5; i++) {",
 				"vec2 coord = clamp(vUv + vec2(float(i) - 2.0) * off, vec2(0.0), vec2(1.0));",
 				"float w = kernel[i];",
@@ -296,7 +314,7 @@ THREE.SuperSSAOBlurShader = {
 				"weightAll += w;",
 				"sum += w * texture2D(tDiffuse, coord).r;",
 			"}",
-		
+
 			"gl_FragColor = vec4(vec3(sum / weightAll), 1.0);",
 
 		"}"
